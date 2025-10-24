@@ -3,81 +3,455 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title id="pageTitle">Mock Chat</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Mock Chat App</title>
+
+  <!-- jsPDF for client-side export (optional) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    /* Fonts */
+    body, input, button, select, textarea {
+      font-family: "Calibri", "Verdana", Arial, sans-serif;
+      font-size: 14px;
+      color: #0e1724;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* Layout */
+    * { box-sizing: border-box; }
+    html,body { height:100%; margin:0; background: linear-gradient(180deg,#eef5fb,#fbfdff); }
+    .app { display:flex; gap:18px; max-width:1200px; margin:20px auto; padding:16px; align-items:stretch; }
+
+    /* Left pane */
+    .leftpane {
+      width:340px;
+      background:#f3f6f8; /* light gray sidebar */
+      border-radius:10px;
+      padding:18px;
+      box-shadow: 0 8px 30px rgba(10,30,70,0.06);
+      display:flex; flex-direction:column; gap:12px;
+    }
+    .app-title { font-weight:700; color:#0b66d0; font-size:18px; margin-bottom:4px; }
+    .conn-status { color:#445; font-size:13px; }
+
+    .tabs { display:flex; gap:8px; margin-top:8px; }
+    .tab { flex:1; padding:8px; border-radius:8px; border:none; background:#fff; cursor:pointer; font-weight:600; }
+    .tab.active { background:#0b66d0; color:white; }
+
+    label { display:block; margin-top:8px; font-weight:600; color:#23314a; }
+    input[type=text], select { width:100%; padding:9px 10px; border-radius:8px; border:1px solid #dfeaf6; background:#fff; margin-top:6px; }
+
+    .primary { background:#0b66d0; color:#fff; border:none; padding:10px 12px; border-radius:8px; cursor:pointer; }
+    .secondary { background:#fff; border:1px solid #e6eef8; padding:8px 10px; border-radius:8px; cursor:pointer; }
+
+    .muted { color:#3a7; margin-top:8px; font-size:13px; }
+    .error { color:#d9534f; margin-top:8px; font-size:13px; }
+
+    /* Main pane */
+    .mainpane { flex:1; display:flex; flex-direction:column; gap:12px; }
+    .chat-header-main { display:flex; justify-content:space-between; align-items:center; }
+    .chatTitle { font-weight:700; color:#0b2b4a; font-size:16px; }
+    #duration { color:#6b7280; font-size:13px; }
+
+    .chatArea {
+      background:#ffffff;
+      border-radius:10px;
+      padding:16px;
+      box-shadow: 0 8px 30px rgba(10,30,70,0.04);
+      display:flex; flex-direction:column; gap:12px; min-height:520px;
+    }
+    .messages { flex:1; overflow:auto; padding:12px; border-radius:8px; background:linear-gradient(180deg,#fcfeff,#f7fbff); border:1px solid rgba(11,102,208,0.03); }
+
+    /* message bubbles */
+    .message { display:block; max-width:72%; padding:10px 12px; margin-bottom:10px; border-radius:12px; box-shadow:0 4px 12px rgba(10,30,60,0.04); clear:both; }
+    .message .meta { font-size:12px; color:#6b7280; margin-bottom:6px; }
+    .message.trainer { background:#0b66d0; color:white; float:left; border-bottom-left-radius:4px; }
+    .message.associate { background:#f1f5f9; color:#0b1220; float:right; border-bottom-right-radius:4px; }
+
+    .system-message { text-align:center; padding:10px; background:#fff5f5; border-radius:8px; color:#d9534f; border:1px solid rgba(217,83,79,0.08); }
+
+    .typingIndicator { color:#6b7280; min-height:18px; font-style:italic; }
+    .chatInputRow { display:flex; gap:8px; align-items:center; }
+    .chatInputRow input { flex:1; padding:11px; border-radius:10px; border:1px solid #e6eef8; }
+    .chatActions { display:flex; gap:8px; align-items:center; margin-top:8px; }
+
+    .footer-note { color:#6b7280; font-size:12px; margin-top:8px; }
+
+    @media (max-width:900px) {
+      .app { flex-direction:column; padding:12px; }
+      .leftpane{ width:100%; }
+    }
+  </style>
 </head>
 <body>
   <div class="app">
-    <header class="topbar">
-      <div class="brand">Mock Chat</div>
-      <div class="header-info" id="headerInfo">Not connected</div>
-    </header>
+    <!-- LEFT PANE -->
+    <aside class="leftpane">
+      <div>
+        <div class="app-title">Mock Chat App</div>
+        <div id="connStatus" class="conn-status">Not connected</div>
+      </div>
 
-    <main>
-      <aside class="panel">
-        <div class="tabs">
-          <button id="tabCreate" class="tab active">Create</button>
-          <button id="tabJoin" class="tab">Join</button>
-        </div>
+      <div class="tabs" style="margin-top:10px;">
+        <button id="tabCreate" class="tab active">Create</button>
+        <button id="tabJoin" class="tab">Join</button>
+      </div>
 
-        <div id="createPanel" class="panel-body">
-          <label>Trainer name</label>
-          <input id="trainerName" type="text" placeholder="e.g. Tom" />
-          <label>Associate name</label>
-          <input id="associateName" type="text" placeholder="e.g. Rob" />
+      <!-- Create area -->
+      <div id="createArea" class="panel-body">
+        <label>Trainer name</label>
+        <input id="trainerName" type="text" placeholder="e.g. Tom" />
+        <label>Associate name</label>
+        <input id="associateName" type="text" placeholder="e.g. Rob" />
+        <div style="display:flex;gap:8px;margin-top:10px;">
           <button id="createBtn" class="primary">Create Conversation</button>
-          <div id="createResult" class="muted"></div>
+        </div>
+        <div id="createResult" class="muted" aria-live="polite"></div>
+      </div>
+
+      <!-- Join area -->
+      <div id="joinArea" class="panel-body hidden">
+        <label>Conversation Key</label>
+        <input id="joinConvKey" type="text" placeholder="Enter conversation key" />
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button id="loadNamesBtn" class="secondary">Load Names</button>
+          <button id="joinBtn" class="primary">Join</button>
         </div>
 
-        <div id="joinPanel" class="panel-body hidden">
-          <label>Conversation Key</label>
-          <input id="joinConvKey" type="text" placeholder="Enter conversation key" />
-          <label>Your name</label>
-          <input id="joinUserName" type="text" placeholder="Trainer or Associate" />
-          <button id="joinBtn" class="primary">Join Conversation</button>
-          <div id="joinResult" class="error"></div>
-        </div>
+        <label style="margin-top:12px">Select Participant</label>
+        <select id="joinNameSelect">
+          <option value="">-- Select Participant --</option>
+        </select>
 
-        <div class="panel-footer">
-          <label>End conversation (trainer)</label>
-          <input id="endConvKey" type="text" placeholder="Conv key" />
-          <input id="endUserName" type="text" placeholder="Trainer name" />
-          <button id="endBtn" class="danger">End Conversation</button>
-          <div id="endResult" class="error"></div>
-        </div>
-      </aside>
+        <div id="joinResult" class="error" aria-live="polite"></div>
+      </div>
 
-      <section class="chat">
-        <div class="chat-header">
-          <div id="chatHeader">Not in a conversation</div>
-          <div id="duration">Duration: 00:00:00</div>
-        </div>
+      <div style="flex:1"></div>
 
+      <div class="footer-note">
+        <div>Frontend: GitHub Pages</div>
+        <div>Backend: Google Apps Script (proxied)</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CHAT AREA -->
+    <main class="mainpane">
+      <div class="chat-header-main">
+        <div id="chatHeader" class="chatTitle">Not in a conversation</div>
+        <div id="duration">Duration: 00:00:00</div>
+      </div>
+
+      <section class="chatArea">
         <div id="messages" class="messages" aria-live="polite"></div>
 
-        <div id="chatStatus" class="chat-status"></div>
+        <div id="chatStatus" class="chatStatus"></div>
+        <div id="typingIndicator" class="typingIndicator"></div>
 
-        <div id="typingIndicator" class="typing"></div>
-
-        <div class="chat-input">
-          <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" />
+        <div class="chatInputRow">
+          <input id="messageInput" type="text" placeholder="Type your message..." autocomplete="off" />
           <button id="sendBtn" class="primary">Send</button>
         </div>
 
-        <div class="chat-actions">
+        <div class="chatActions">
           <button id="exportBtn" class="secondary" style="display:none">Export PDF</button>
-          <button id="endChatBtn" class="danger" style="display:none">End Conversation</button>
           <div id="chatResult" class="muted"></div>
         </div>
       </section>
     </main>
-
-    <footer class="footer">
-      <small>Frontend hosted on Netlify • Backend: Google Apps Script</small>
-    </footer>
   </div>
 
-  <script src="script.js"></script>
+<script>
+/*
+  Single-file frontend for GitHub Pages.
+  Uses a public CORS proxy so the frontend can call your Apps Script endpoint from GitHub Pages.
+
+  IMPORTANT:
+  - If you redeploy your Apps Script, update BACKEND_URL below.
+  - The code expects the backend to implement the API actions:
+    GET ?action=getMessages&key=...
+    GET ?action=getUserRoleAndStartTime&key=...&name=...
+    POST { action:'createConversation', trainer, associate }
+    POST { action:'sendMessage', key, sender, role, text }
+    POST { action:'endConversation', key, trainer }
+*/
+
+const BACKEND_URL = "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+const PROXY = "https://corsproxy.io/?"; // proxy added automatically
+const POLLING_MS = 2000; // 2 seconds as requested
+
+// helper to get element
+const $ = id => document.getElementById(id);
+
+// UI refs
+const tabCreate = $('tabCreate'), tabJoin = $('tabJoin');
+const createArea = $('createArea'), joinArea = $('joinArea');
+const trainerName = $('trainerName'), associateName = $('associateName');
+const createBtn = $('createBtn'), createResult = $('createResult');
+const joinConvKey = $('joinConvKey'), loadNamesBtn = $('loadNamesBtn'), joinBtn = $('joinBtn');
+const joinNameSelect = $('joinNameSelect'), joinResult = $('joinResult');
+const connStatus = $('connStatus');
+
+const chatHeader = $('chatHeader'), durationEl = $('duration');
+const messagesEl = $('messages'), typingIndicator = $('typingIndicator');
+const messageInput = $('messageInput'), sendBtn = $('sendBtn');
+const exportBtn = $('exportBtn'), chatResult = $('chatResult'), chatStatus = $('chatStatus');
+
+let currentConvKey = null, currentUserName = null, currentUserRole = null, conversationStartTime = null;
+let lastMessageCount = 0, pollTimer = null, sendingInProgress = false;
+
+// Proxy wrappers
+async function apiGet(params = {}) {
+  const u = new URL(BACKEND_URL);
+  Object.keys(params).forEach(k => u.searchParams.append(k, params[k]));
+  const proxied = PROXY + encodeURIComponent(u.toString());
+  const res = await fetch(proxied, { method: 'GET' });
+  if (!res.ok) throw new Error('Network response not ok: ' + res.status);
+  return res.json();
+}
+async function apiPost(payload = {}) {
+  const proxied = PROXY + encodeURIComponent(BACKEND_URL);
+  const res = await fetch(proxied, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Network response not ok: ' + res.status);
+  return res.json();
+}
+
+// UI tab switching
+tabCreate.addEventListener('click', () => {
+  tabCreate.classList.add('active'); tabJoin.classList.remove('active');
+  createArea.classList.remove('hidden'); joinArea.classList.add('hidden');
+});
+tabJoin.addEventListener('click', () => {
+  tabJoin.classList.add('active'); tabCreate.classList.remove('active');
+  joinArea.classList.remove('hidden'); createArea.classList.add('hidden');
+});
+
+// Create conversation
+createBtn.addEventListener('click', async () => {
+  createResult.textContent = '';
+  const t = trainerName.value.trim(), a = associateName.value.trim();
+  if (!t || !a) { createResult.textContent = 'Please enter both names'; return; }
+  createResult.textContent = 'Creating...';
+  try {
+    const out = await apiPost({ action: 'createConversation', trainer: t, associate: a });
+    if (!out || !out.key) throw new Error('Create failed');
+    currentConvKey = out.key;
+    currentUserName = t;
+    currentUserRole = 'trainer';
+    conversationStartTime = new Date();
+    chatHeader.textContent = `Mock Chat : ${t} (Trainer) | ${a}`;
+    connStatus.textContent = `Key: ${out.key}`;
+    createResult.textContent = `Created: ${out.key}`;
+    trainerName.value = ''; associateName.value = '';
+    startChat();
+  } catch (err) {
+    createResult.textContent = 'Error: ' + (err.message || err);
+    console.error('createConversation error', err);
+  }
+});
+
+// Load names for join (attempts backend; falls back gracefully)
+loadNamesBtn.addEventListener('click', async () => {
+  joinResult.textContent = '';
+  joinNameSelect.innerHTML = '<option>Loading...</option>';
+  const key = joinConvKey.value.trim();
+  if (!key) { joinResult.textContent = 'Enter conversation key first'; joinNameSelect.innerHTML = '<option value="">-- Select Participant --</option>'; return; }
+  try {
+    // Try to fetch trainer/associate names (backend must support returning names without exact name)
+    const data = await apiGet({ action: 'getUserRoleAndStartTime', key, name: '' });
+    if (data && data.trainerName && data.associateName) {
+      joinNameSelect.innerHTML = '';
+      const tOpt = document.createElement('option'); tOpt.value = `${data.trainerName}|trainer`; tOpt.textContent = `${data.trainerName} (Trainer)`;
+      const aOpt = document.createElement('option'); aOpt.value = `${data.associateName}|associate`; aOpt.textContent = `${data.associateName} (Associate)`;
+      joinNameSelect.appendChild(tOpt);
+      joinNameSelect.appendChild(aOpt);
+      joinResult.textContent = 'Names loaded. Choose your identity and click Join.';
+    } else {
+      joinNameSelect.innerHTML = '<option value="">-- Select Participant --</option>';
+      joinResult.textContent = 'Could not auto-load names. You can double-click the dropdown to type your name.';
+    }
+  } catch (err) {
+    joinNameSelect.innerHTML = '<option value="">-- Select Participant --</option>';
+    joinResult.textContent = 'Could not load names automatically. You can double-click the dropdown to type your name.';
+    console.warn('loadNamesBtn error', err);
+  }
+});
+
+// support double-click to replace select with input for manual name entry
+joinNameSelect.addEventListener('dblclick', () => {
+  const input = document.createElement('input');
+  input.type = 'text'; input.id = 'joinNameInput'; input.placeholder = 'Type your name (e.g. Rob)';
+  joinNameSelect.replaceWith(input);
+});
+
+// Join action
+joinBtn.addEventListener('click', async () => {
+  joinResult.textContent = '';
+  const key = joinConvKey.value.trim();
+  if (!key) { joinResult.textContent = 'Enter conversation key'; return; }
+  const nameField = document.getElementById('joinNameInput');
+  let selected = '';
+  if (nameField) selected = nameField.value.trim();
+  else selected = (joinNameSelect.value || '').split('|')[0];
+
+  if (!selected) { joinResult.textContent = 'Choose or enter your name'; return; }
+
+  try {
+    const data = await apiGet({ action: 'getUserRoleAndStartTime', key, name: selected });
+    if (!data) { joinResult.textContent = 'Invalid conversation key or name'; return; }
+    currentConvKey = data.convKey || key;
+    currentUserName = selected;
+    currentUserRole = data.role || (joinNameSelect.value.includes('|') ? joinNameSelect.value.split('|')[1] : 'associate');
+    conversationStartTime = data.startTime ? new Date(data.startTime) : new Date();
+    chatHeader.textContent = `Mock Chat : ${data.trainerName || 'Trainer'} (Trainer) | ${data.associateName || 'Associate'}`;
+    connStatus.textContent = `Key: ${currentConvKey}`;
+    joinResult.textContent = '';
+    startChat();
+  } catch (err) {
+    joinResult.textContent = 'Error joining: ' + (err.message || err);
+    console.error('joinConversation error', err);
+  }
+});
+
+// Start polling and UI
+function startChat() {
+  if (pollTimer) clearInterval(pollTimer);
+  fetchMessages();
+  pollTimer = setInterval(fetchMessages, POLLING_MS);
+  exportBtn.style.display = 'inline-block';
+  updateDuration();
+}
+
+// Fetch messages
+async function fetchMessages() {
+  if (!currentConvKey) return;
+  try {
+    const list = await apiGet({ action: 'getMessages', key: currentConvKey });
+    if (!Array.isArray(list)) return;
+    if (list.length > lastMessageCount) {
+      const newMessages = list.slice(lastMessageCount);
+      newMessages.forEach(m => { if (m.sender !== currentUserName) notifyDesktop(m); });
+      lastMessageCount = list.length;
+    }
+    renderMessages(list);
+  } catch (err) {
+    console.error('fetchMessages error', err);
+  }
+}
+
+// Render messages
+function renderMessages(messages) {
+  messagesEl.innerHTML = '';
+  messages.forEach(msg => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message ' + (msg.role === 'trainer' ? 'trainer' : 'associate');
+    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${msg.sender} • ${new Date(msg.timestamp).toLocaleTimeString()}`;
+    const text = document.createElement('div'); text.textContent = msg.text;
+    wrapper.appendChild(meta); wrapper.appendChild(text);
+    messagesEl.appendChild(wrapper);
+  });
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Desktop notifications (only)
+function notifyDesktop(msg) {
+  if ("Notification" in window && Notification.permission === 'granted' && document.hidden) {
+    try {
+      const n = new Notification(`${msg.sender}`, { body: msg.text.length > 80 ? msg.text.slice(0,77) + '...' : msg.text });
+      n.onclick = () => window.focus();
+      setTimeout(() => n.close(), 5000);
+    } catch (e) { console.warn('notifyDesktop failed', e); }
+  }
+}
+
+// Sending message (prevents duplicates)
+sendBtn.addEventListener('click', sendMessage);
+messageInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') sendMessage(); });
+
+async function sendMessage() {
+  if (sendingInProgress) return;
+  const txt = messageInput.value.trim();
+  if (!txt || !currentConvKey || !currentUserName) return;
+  sendingInProgress = true;
+
+  // optimistic UI
+  appendLocal({ sender: currentUserName, role: currentUserRole, text: txt, timestamp: new Date().toISOString() });
+  messageInput.value = ''; messageInput.placeholder = 'Sending...'; messageInput.disabled = true; sendBtn.disabled = true;
+
+  try {
+    await apiPost({ action: 'sendMessage', key: currentConvKey, sender: currentUserName, role: currentUserRole, text: txt });
+    await fetchMessages();
+  } catch (err) {
+    alert('Send failed: ' + (err.message || err));
+    console.error('sendMessage error', err);
+  } finally {
+    messageInput.placeholder = 'Type your message...'; messageInput.disabled = false; sendBtn.disabled = false; messageInput.focus();
+    sendingInProgress = false;
+  }
+}
+
+function appendLocal(msg) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'message ' + (msg.role === 'trainer' ? 'trainer' : 'associate');
+  const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${msg.sender} • ${new Date(msg.timestamp).toLocaleTimeString()}`;
+  const text = document.createElement('div'); text.textContent = msg.text;
+  wrapper.appendChild(meta); wrapper.appendChild(text);
+  messagesEl.appendChild(wrapper);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Export PDF (client-side)
+exportBtn.addEventListener('click', async () => {
+  if (!messagesEl.children.length) { alert('No messages'); return; }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+  let y = 40; pdf.setFontSize(14); pdf.text('Conversation Export', 40, y); y += 20;
+  pdf.setFontSize(11);
+  for (const node of messagesEl.children) {
+    const txt = node.textContent.trim();
+    const lines = pdf.splitTextToSize(txt, 520);
+    if (y + lines.length * 14 > 780) { pdf.addPage(); y = 40; }
+    pdf.text(lines, 40, y); y += lines.length * 14 + 8;
+  }
+  pdf.save(`Conversation_${currentConvKey || 'chat'}.pdf`);
+});
+
+// duration update
+function updateDuration() {
+  if (!conversationStartTime) return;
+  const diff = Date.now() - conversationStartTime.getTime();
+  const hrs = Math.floor(diff / 3600000), mins = Math.floor((diff % 3600000) / 60000), secs = Math.floor((diff % 60000) / 1000);
+  const pad = n => String(n).padStart(2, '0');
+  durationEl.textContent = `Duration: ${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  setTimeout(updateDuration, 1000);
+}
+
+// Reset UI
+function resetUI() {
+  currentConvKey = null; currentUserName = null; currentUserRole = null; conversationStartTime = null;
+  lastMessageCount = 0; messagesEl.innerHTML = ''; typingIndicator.textContent = ''; messageInput.value = '';
+  messageInput.disabled = false; sendBtn.disabled = false; exportBtn.style.display = 'none'; chatStatus.innerHTML = '';
+  chatHeader.textContent = 'Not in a conversation'; connStatus.textContent = 'Not connected'; document.title = 'Mock Chat App';
+  if (pollTimer) clearInterval(pollTimer);
+}
+
+// Initialization
+document.addEventListener('DOMContentLoaded', () => {
+  // restore the header title if previously saved
+  const saved = localStorage.getItem('chatTitle');
+  if (saved) { chatHeader.textContent = saved; document.title = saved; }
+
+  // ask for desktop notification permission politely (only if default)
+  if ("Notification" in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(p => console.log('Notification permission:', p));
+  }
+
+  // initial UI state
+  resetUI();
+});
+</script>
 </body>
 </html>
