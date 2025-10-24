@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title id="pageTitle">Mock Chat</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">Mock Chat</div>
+      <div class="header-info" id="headerInfo">Not connected</div>
+    </header>
+
+    <main>
+      <aside class="panel">
+        <div class="tabs">
+          <button id="tabCreate" class="tab active">Create</button>
+          <button id="tabJoin" class="tab">Join</button>
+        </div>
+
+        <div id="createPanel" class="panel-body">
+          <label>Trainer name</label>
+          <input id="trainerName" type="text" placeholder="e.g. Tom" />
+          <label>Associate name</label>
+          <input id="associateName" type="text" placeholder="e.g. Rob" />
+          <button id="createBtn" class="primary">Create Conversation</button>
+          <div id="createResult" class="muted"></div>
+        </div>
+
+        <div id="joinPanel" class="panel-body hidden">
+          <label>Conversation Key</label>
+          <input id="joinConvKey" type="text" placeholder="Enter conversation key" />
+          <label>Your name</label>
+          <input id="joinUserName" type="text" placeholder="Trainer or Associate" />
+          <button id="joinBtn" class="primary">Join Conversation</button>
+          <div id="joinResult" class="error"></div>
+        </div>
+
+        <div class="panel-footer">
+          <label>End conversation (trainer)</label>
+          <input id="endConvKey" type="text" placeholder="Conv key" />
+          <input id="endUserName" type="text" placeholder="Trainer name" />
+          <button id="endBtn" class="danger">End Conversation</button>
+          <div id="endResult" class="error"></div>
+        </div>
+      </aside>
+
+      <section class="chat">
+        <div class="chat-header">
+          <div id="chatHeader">Not in a conversation</div>
+          <div id="duration">Duration: 00:00:00</div>
+        </div>
+
+        <div id="messages" class="messages" aria-live="polite"></div>
+
+        <div id="chatStatus" class="chat-status"></div>
+
+        <div id="typingIndicator" class="typing"></div>
+
+        <div class="chat-input">
+          <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off" />
+          <button id="sendBtn" class="primary">Send</button>
+        </div>
+
+        <div class="chat-actions">
+          <button id="exportBtn" class="secondary" style="display:none">Export PDF</button>
+          <button id="endChatBtn" class="danger" style="display:none">End Conversation</button>
+          <div id="chatResult" class="muted"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <small>Frontend hosted on Netlify • Backend: Google Apps Script</small>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
