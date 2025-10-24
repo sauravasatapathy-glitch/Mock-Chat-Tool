@@ -1,7 +1,6 @@
 // /api/proxy.js
 export default async function handler(req, res) {
-  const BACKEND_URL =
-    "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
 
   try {
     // Determine method (GET or POST)
