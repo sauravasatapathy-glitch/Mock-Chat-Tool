@@ -1,24 +1,39 @@
+// /api/proxy.js
 export default async function handler(req, res) {
-  // 🔹 Replace this with your actual Google Apps Script Web App URL
-  const SCRIPT_URL = "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+  const BACKEND_URL =
+    "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
 
   try {
-    // Forward the request to your Apps Script web app
-    const response = await fetch(SCRIPT_URL, {
-      method: req.method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: req.method === "POST" ? JSON.stringify(req.body) : undefined,
-    });
+    // Determine method (GET or POST)
+    const method = req.method;
 
-    // Get text response (Apps Script may return plain text or JSON)
-    const data = await response.text();
+    // Construct target URL
+    const url = new URL(BACKEND_URL);
+    if (method === "GET") {
+      Object.keys(req.query).forEach(k => url.searchParams.append(k, req.query[k]));
+    }
 
-    // Forward status + data back to the browser
-    res.status(response.status).send(data);
-  } catch (error) {
-    console.error("Proxy error:", error);
-    res.status(500).json({ error: "Proxy failed to reach Apps Script" });
+    // Prepare fetch options
+    const options = { method };
+    if (method === "POST") {
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify(req.body);
+    }
+
+    // Forward the request
+    const response = await fetch(url.toString(), options);
+    const text = await response.text();
+
+    // Try parsing JSON, fallback to text
+    try {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.status(response.status).json(JSON.parse(text));
+    } catch {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.status(response.status).send(text);
+    }
+  } catch (err) {
+    console.error("Proxy error:", err);
+    res.status(500).json({ error: err.message });
   }
 }
