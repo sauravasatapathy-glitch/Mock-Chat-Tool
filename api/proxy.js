@@ -1,29 +1,24 @@
 export default async function handler(req, res) {
-  const targetUrl = "https://script.google.com/macros/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+  // 🔹 Replace this with your actual Google Apps Script Web App URL
+  const SCRIPT_URL = "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
 
   try {
-    const method = req.method;
-    const headers = { "Content-Type": "application/json" };
-
-    // Forward GET or POST to Apps Script
-    const response = await fetch(targetUrl, {
-      method,
-      headers,
-      body: method === "POST" ? JSON.stringify(req.body) : undefined,
+    // Forward the request to your Apps Script web app
+    const response = await fetch(SCRIPT_URL, {
+      method: req.method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: req.method === "POST" ? JSON.stringify(req.body) : undefined,
     });
 
+    // Get text response (Apps Script may return plain text or JSON)
     const data = await response.text();
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") {
-      res.status(200).end();
-      return;
-    }
 
+    // Forward status + data back to the browser
     res.status(response.status).send(data);
   } catch (error) {
     console.error("Proxy error:", error);
-    res.status(500).json({ error: "Proxy failed", details: error.message });
+    res.status(500).json({ error: "Proxy failed to reach Apps Script" });
   }
 }
