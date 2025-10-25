@@ -1,34 +1,39 @@
 // /api/proxy.js
 export default async function handler(req, res) {
-const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+  const BACKEND_URL =
+    "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
 
   try {
-    // Determine method (GET or POST)
     const method = req.method;
 
-    // Construct target URL
+    // Build target URL
     const url = new URL(BACKEND_URL);
-    if (method === "GET") {
-      Object.keys(req.query).forEach(k => url.searchParams.append(k, req.query[k]));
-    }
 
-    // Prepare fetch options
+    // Prepare options
     const options = { method };
-    if (method === "POST") {
-      options.headers = { "Content-Type": "application/json" };
-      options.body = JSON.stringify(req.body);
+
+    if (method === "GET") {
+      Object.keys(req.query || {}).forEach(k =>
+        url.searchParams.append(k, req.query[k])
+      );
+    } else if (method === "POST") {
+      // 👇 Google Apps Script prefers form-style POST, not JSON
+      const body = new URLSearchParams();
+      for (const [key, value] of Object.entries(req.body || {})) {
+        body.append(key, typeof value === "object" ? JSON.stringify(value) : value);
+      }
+      options.headers = { "Content-Type": "application/x-www-form-urlencoded" };
+      options.body = body.toString();
     }
 
-    // Forward the request
     const response = await fetch(url.toString(), options);
     const text = await response.text();
 
-    // Try parsing JSON, fallback to text
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
     try {
-      res.setHeader("Access-Control-Allow-Origin", "*");
       res.status(response.status).json(JSON.parse(text));
     } catch {
-      res.setHeader("Access-Control-Allow-Origin", "*");
       res.status(response.status).send(text);
     }
   } catch (err) {
