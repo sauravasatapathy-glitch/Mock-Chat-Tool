@@ -1,25 +1,22 @@
 // /api/proxy.js
 export default async function handler(req, res) {
   const BACKEND_URL =
-  "https://script.google.com/macros/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+    "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+
   try {
     const method = req.method;
-
-    // Build target URL
     const url = new URL(BACKEND_URL);
-
-    // Prepare options
     const options = { method };
 
     if (method === "GET") {
-      Object.keys(req.query || {}).forEach(k =>
-        url.searchParams.append(k, req.query[k])
-      );
+      for (const [k, v] of Object.entries(req.query || {})) {
+        url.searchParams.append(k, v);
+      }
     } else if (method === "POST") {
-      // 👇 Google Apps Script prefers form-style POST, not JSON
+      // Convert JSON to form data, which Apps Script accepts
       const body = new URLSearchParams();
-      for (const [key, value] of Object.entries(req.body || {})) {
-        body.append(key, typeof value === "object" ? JSON.stringify(value) : value);
+      for (const [k, v] of Object.entries(req.body || {})) {
+        body.append(k, typeof v === "object" ? JSON.stringify(v) : v);
       }
       options.headers = { "Content-Type": "application/x-www-form-urlencoded" };
       options.body = body.toString();
