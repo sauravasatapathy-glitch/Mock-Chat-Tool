@@ -114,7 +114,6 @@
         <label>Conversation Key</label>
         <input id="joinConvKey" type="text" placeholder="Enter conversation key" />
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="loadNamesBtn" class="secondary">Load Names</button>
           <button id="joinBtn" class="primary">Join</button>
         </div>
 
@@ -221,14 +220,29 @@ joinBtn.addEventListener('click', async () => {
 
   try {
     const conv = await getConversation(key);
-    if (!conv) return joinResult.textContent = 'Conversation not found';
+    if (!conv || conv.error) {
+      joinResult.textContent = 'Conversation not found';
+      return;
+    }
+
+    // 🧠 Normalize DB response to camelCase
+    const normalizedConv = {
+      convKey: conv.conv_key,
+      trainerName: conv.trainer_name,
+      associateName: conv.associate_name,
+      startTime: conv.start_time,
+      ended: conv.ended
+    };
 
     currentConvKey = key;
     currentUserName = name;
-    currentUserRole = conv.trainerName === name ? 'trainer' : 'associate';
-    chatHeader.textContent = `${conv.trainerName} (Trainer) | ${conv.associateName}`;
+    currentUserRole =
+      normalizedConv.trainerName.toLowerCase() === name.toLowerCase()
+        ? 'trainer'
+        : 'associate';
+    chatHeader.textContent = `${normalizedConv.trainerName} (Trainer) | ${normalizedConv.associateName}`;
     connStatus.textContent = `Key: ${key}`;
-    conversationStartTime = conv.startTime ? new Date(conv.startTime) : new Date();
+    conversationStartTime = normalizedConv.startTime ? new Date(normalizedConv.startTime) : new Date();
     joinResult.textContent = 'Joined successfully.';
     startChat();
   } catch (err) {
@@ -236,6 +250,32 @@ joinBtn.addEventListener('click', async () => {
     joinResult.textContent = 'Error joining conversation';
   }
 });
+  // Auto-load participant names when conversation key input loses focus
+joinConvKey.addEventListener('blur', async () => {
+  const key = joinConvKey.value.trim();
+  if (!key) return; // skip if empty
+
+  try {
+    const conv = await getConversation(key);
+    if (!conv || conv.error) {
+      joinResult.textContent = 'Conversation not found';
+      joinNameSelect.innerHTML = `<option value="">-- Select Participant --</option>`;
+      return;
+    }
+
+    joinNameSelect.innerHTML = `
+      <option value="">-- Select Participant --</option>
+      <option value="${conv.trainer_name}">Trainer: ${conv.trainer_name}</option>
+      <option value="${conv.associate_name}">Associate: ${conv.associate_name}</option>
+    `;
+
+    joinResult.textContent = 'Names loaded automatically.';
+  } catch (err) {
+    console.error('Error fetching conversation:', err);
+    joinResult.textContent = 'Failed to load names.';
+  }
+});
+
 
 // start chat loop
 function startChat() {
@@ -299,5 +339,6 @@ function updateDuration() {
 
 </body>
 </html>
+
 
 
