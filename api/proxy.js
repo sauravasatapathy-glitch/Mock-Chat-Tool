@@ -1,7 +1,7 @@
 // /api/proxy.js
 export default async function handler(req, res) {
   const BACKEND_URL =
-    "https://script.google.com/a/macros/24-7intouch.com/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec";
+    "https://script.google.com/macros/s/AKfycbxn1WhLs8RR2KgdIUGYggiDsUZcjbLKPvPjlU4kMqi-zyIkugS3ACPLdkhTVn4AJI7K/exec"; 
 
   try {
     const method = req.method;
@@ -13,7 +13,6 @@ export default async function handler(req, res) {
         url.searchParams.append(k, v);
       }
     } else if (method === "POST") {
-      // Convert JSON to form data, which Apps Script accepts
       const body = new URLSearchParams();
       for (const [k, v] of Object.entries(req.body || {})) {
         body.append(k, typeof v === "object" ? JSON.stringify(v) : v);
