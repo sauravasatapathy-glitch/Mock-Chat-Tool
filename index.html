@@ -160,29 +160,12 @@
     </main>
   </div>
 
-<script>
-/*
-  Single-file frontend for GitHub Pages.
-  Uses a public CORS proxy so the frontend can call your Apps Script endpoint from GitHub Pages.
+<script type="module">
+import { createConversation, sendMessage, getMessages, getConversation } from "./api.js";
 
-  IMPORTANT:
-  - If you redeploy your Apps Script, update BACKEND_URL below.
-  - The code expects the backend to implement the API actions:
-    GET ?action=getMessages&key=...
-    GET ?action=getUserRoleAndStartTime&key=...&name=...
-    POST { action:'createConversation', trainer, associate }
-    POST { action:'sendMessage', key, sender, role, text }
-    POST { action:'endConversation', key, trainer }
-*/
-
-const BACKEND_URL = "https://mock-chat-tool.vercel.app/api/proxy";
-const PROXY = ""; // not needed anymore
-const POLLING_MS = 2000; // 2 seconds as requested
-
-// helper to get element
+const POLLING_MS = 2000;
 const $ = id => document.getElementById(id);
 
-// UI refs
 const tabCreate = $('tabCreate'), tabJoin = $('tabJoin');
 const createArea = $('createArea'), joinArea = $('joinArea');
 const trainerName = $('trainerName'), associateName = $('associateName');
@@ -190,36 +173,15 @@ const createBtn = $('createBtn'), createResult = $('createResult');
 const joinConvKey = $('joinConvKey'), loadNamesBtn = $('loadNamesBtn'), joinBtn = $('joinBtn');
 const joinNameSelect = $('joinNameSelect'), joinResult = $('joinResult');
 const connStatus = $('connStatus');
-
 const chatHeader = $('chatHeader'), durationEl = $('duration');
 const messagesEl = $('messages'), typingIndicator = $('typingIndicator');
 const messageInput = $('messageInput'), sendBtn = $('sendBtn');
-const exportBtn = $('exportBtn'), chatResult = $('chatResult'), chatStatus = $('chatStatus');
+const exportBtn = $('exportBtn'), chatStatus = $('chatStatus');
 
 let currentConvKey = null, currentUserName = null, currentUserRole = null, conversationStartTime = null;
 let lastMessageCount = 0, pollTimer = null, sendingInProgress = false;
 
-// Proxy wrappers
-async function apiGet(params = {}) {
-  const u = new URL(BACKEND_URL);
-  Object.keys(params).forEach(k => u.searchParams.append(k, params[k]));
-  const proxied = PROXY + encodeURIComponent(u.toString());
-  const res = await fetch(proxied, { method: 'GET' });
-  if (!res.ok) throw new Error('Network response not ok: ' + res.status);
-  return res.json();
-}
-async function apiPost(payload = {}) {
-  const proxied = PROXY + encodeURIComponent(BACKEND_URL);
-  const res = await fetch(proxied, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) throw new Error('Network response not ok: ' + res.status);
-  return res.json();
-}
-
-// UI tab switching
+// tab switching
 tabCreate.addEventListener('click', () => {
   tabCreate.classList.add('active'); tabJoin.classList.remove('active');
   createArea.classList.remove('hidden'); joinArea.classList.add('hidden');
@@ -229,94 +191,53 @@ tabJoin.addEventListener('click', () => {
   joinArea.classList.remove('hidden'); createArea.classList.add('hidden');
 });
 
-// Create conversation
+// create conversation
 createBtn.addEventListener('click', async () => {
-  createResult.textContent = '';
   const t = trainerName.value.trim(), a = associateName.value.trim();
-  if (!t || !a) { createResult.textContent = 'Please enter both names'; return; }
+  if (!t || !a) return createResult.textContent = 'Please enter both names';
   createResult.textContent = 'Creating...';
   try {
-    const out = await apiPost({ action: 'createConversation', trainer: t, associate: a });
-    if (!out || !out.key) throw new Error('Create failed');
-    currentConvKey = out.key;
+    const out = await createConversation(t, a);
+    if (!out.convKey) throw new Error('Failed to create conversation');
+    currentConvKey = out.convKey;
     currentUserName = t;
     currentUserRole = 'trainer';
     conversationStartTime = new Date();
-    chatHeader.textContent = `Mock Chat : ${t} (Trainer) | ${a}`;
-    connStatus.textContent = `Key: ${out.key}`;
-    createResult.textContent = `Created: ${out.key}`;
-    trainerName.value = ''; associateName.value = '';
+    chatHeader.textContent = `${t} (Trainer) | ${a}`;
+    connStatus.textContent = `Key: ${out.convKey}`;
+    createResult.textContent = `Created: ${out.convKey}`;
     startChat();
-  } catch (err) {
-    createResult.textContent = 'Error: ' + (err.message || err);
-    console.error('createConversation error', err);
+  } catch (e) {
+    console.error(e);
+    createResult.textContent = e.message;
   }
 });
 
-// Load names for join (attempts backend; falls back gracefully)
-loadNamesBtn.addEventListener('click', async () => {
-  joinResult.textContent = '';
-  joinNameSelect.innerHTML = '<option>Loading...</option>';
-  const key = joinConvKey.value.trim();
-  if (!key) { joinResult.textContent = 'Enter conversation key first'; joinNameSelect.innerHTML = '<option value="">-- Select Participant --</option>'; return; }
-  try {
-    // Try to fetch trainer/associate names (backend must support returning names without exact name)
-    const data = await apiGet({ action: 'getUserRoleAndStartTime', key, name: '' });
-    if (data && data.trainerName && data.associateName) {
-      joinNameSelect.innerHTML = '';
-      const tOpt = document.createElement('option'); tOpt.value = `${data.trainerName}|trainer`; tOpt.textContent = `${data.trainerName} (Trainer)`;
-      const aOpt = document.createElement('option'); aOpt.value = `${data.associateName}|associate`; aOpt.textContent = `${data.associateName} (Associate)`;
-      joinNameSelect.appendChild(tOpt);
-      joinNameSelect.appendChild(aOpt);
-      joinResult.textContent = 'Names loaded. Choose your identity and click Join.';
-    } else {
-      joinNameSelect.innerHTML = '<option value="">-- Select Participant --</option>';
-      joinResult.textContent = 'Could not auto-load names. You can double-click the dropdown to type your name.';
-    }
-  } catch (err) {
-    joinNameSelect.innerHTML = '<option value="">-- Select Participant --</option>';
-    joinResult.textContent = 'Could not load names automatically. You can double-click the dropdown to type your name.';
-    console.warn('loadNamesBtn error', err);
-  }
-});
-
-// support double-click to replace select with input for manual name entry
-joinNameSelect.addEventListener('dblclick', () => {
-  const input = document.createElement('input');
-  input.type = 'text'; input.id = 'joinNameInput'; input.placeholder = 'Type your name (e.g. Rob)';
-  joinNameSelect.replaceWith(input);
-});
-
-// Join action
+// join conversation
 joinBtn.addEventListener('click', async () => {
-  joinResult.textContent = '';
   const key = joinConvKey.value.trim();
-  if (!key) { joinResult.textContent = 'Enter conversation key'; return; }
-  const nameField = document.getElementById('joinNameInput');
-  let selected = '';
-  if (nameField) selected = nameField.value.trim();
-  else selected = (joinNameSelect.value || '').split('|')[0];
-
-  if (!selected) { joinResult.textContent = 'Choose or enter your name'; return; }
+  const name = (joinNameSelect.value || '').split('|')[0];
+  if (!key || !name) return joinResult.textContent = 'Enter key and name';
 
   try {
-    const data = await apiGet({ action: 'getUserRoleAndStartTime', key, name: selected });
-    if (!data) { joinResult.textContent = 'Invalid conversation key or name'; return; }
-    currentConvKey = data.convKey || key;
-    currentUserName = selected;
-    currentUserRole = data.role || (joinNameSelect.value.includes('|') ? joinNameSelect.value.split('|')[1] : 'associate');
-    conversationStartTime = data.startTime ? new Date(data.startTime) : new Date();
-    chatHeader.textContent = `Mock Chat : ${data.trainerName || 'Trainer'} (Trainer) | ${data.associateName || 'Associate'}`;
-    connStatus.textContent = `Key: ${currentConvKey}`;
-    joinResult.textContent = '';
+    const conv = await getConversation(key);
+    if (!conv) return joinResult.textContent = 'Conversation not found';
+
+    currentConvKey = key;
+    currentUserName = name;
+    currentUserRole = conv.trainerName === name ? 'trainer' : 'associate';
+    chatHeader.textContent = `${conv.trainerName} (Trainer) | ${conv.associateName}`;
+    connStatus.textContent = `Key: ${key}`;
+    conversationStartTime = conv.startTime ? new Date(conv.startTime) : new Date();
+    joinResult.textContent = 'Joined successfully.';
     startChat();
   } catch (err) {
-    joinResult.textContent = 'Error joining: ' + (err.message || err);
-    console.error('joinConversation error', err);
+    console.error(err);
+    joinResult.textContent = 'Error joining conversation';
   }
 });
 
-// Start polling and UI
+// start chat loop
 function startChat() {
   if (pollTimer) clearInterval(pollTimer);
   fetchMessages();
@@ -325,134 +246,58 @@ function startChat() {
   updateDuration();
 }
 
-// Fetch messages
+// fetch messages
 async function fetchMessages() {
   if (!currentConvKey) return;
   try {
-    const list = await apiGet({ action: 'getMessages', key: currentConvKey });
+    const list = await getMessages(currentConvKey);
     if (!Array.isArray(list)) return;
-    if (list.length > lastMessageCount) {
-      const newMessages = list.slice(lastMessageCount);
-      newMessages.forEach(m => { if (m.sender !== currentUserName) notifyDesktop(m); });
-      lastMessageCount = list.length;
-    }
     renderMessages(list);
   } catch (err) {
     console.error('fetchMessages error', err);
   }
 }
 
-// Render messages
+// render
 function renderMessages(messages) {
   messagesEl.innerHTML = '';
-  messages.forEach(msg => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'message ' + (msg.role === 'trainer' ? 'trainer' : 'associate');
-    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${msg.sender} • ${new Date(msg.timestamp).toLocaleTimeString()}`;
-    const text = document.createElement('div'); text.textContent = msg.text;
-    wrapper.appendChild(meta); wrapper.appendChild(text);
-    messagesEl.appendChild(wrapper);
-  });
+  for (const msg of messages) {
+    const div = document.createElement('div');
+    div.className = 'message ' + (msg.role === 'trainer' ? 'trainer' : 'associate');
+    div.innerHTML = `<div class="meta">${msg.senderName} • ${new Date(msg.timestamp).toLocaleTimeString()}</div><div>${msg.text}</div>`;
+    messagesEl.appendChild(div);
+  }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// Desktop notifications (only)
-function notifyDesktop(msg) {
-  if ("Notification" in window && Notification.permission === 'granted' && document.hidden) {
-    try {
-      const n = new Notification(`${msg.sender}`, { body: msg.text.length > 80 ? msg.text.slice(0,77) + '...' : msg.text });
-      n.onclick = () => window.focus();
-      setTimeout(() => n.close(), 5000);
-    } catch (e) { console.warn('notifyDesktop failed', e); }
-  }
-}
+// send message
+sendBtn.addEventListener('click', sendMsg);
+messageInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
 
-// Sending message (prevents duplicates)
-sendBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') sendMessage(); });
-
-async function sendMessage() {
-  if (sendingInProgress) return;
+async function sendMsg() {
   const txt = messageInput.value.trim();
-  if (!txt || !currentConvKey || !currentUserName) return;
-  sendingInProgress = true;
-
-  // optimistic UI
-  appendLocal({ sender: currentUserName, role: currentUserRole, text: txt, timestamp: new Date().toISOString() });
-  messageInput.value = ''; messageInput.placeholder = 'Sending...'; messageInput.disabled = true; sendBtn.disabled = true;
-
+  if (!txt || !currentConvKey) return;
+  messageInput.value = '';
   try {
-    await apiPost({ action: 'sendMessage', key: currentConvKey, sender: currentUserName, role: currentUserRole, text: txt });
+    await sendMessage(currentConvKey, currentUserName, currentUserRole, txt);
     await fetchMessages();
   } catch (err) {
-    alert('Send failed: ' + (err.message || err));
-    console.error('sendMessage error', err);
-  } finally {
-    messageInput.placeholder = 'Type your message...'; messageInput.disabled = false; sendBtn.disabled = false; messageInput.focus();
-    sendingInProgress = false;
+    alert('Send failed: ' + err.message);
   }
 }
 
-function appendLocal(msg) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message ' + (msg.role === 'trainer' ? 'trainer' : 'associate');
-  const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${msg.sender} • ${new Date(msg.timestamp).toLocaleTimeString()}`;
-  const text = document.createElement('div'); text.textContent = msg.text;
-  wrapper.appendChild(meta); wrapper.appendChild(text);
-  messagesEl.appendChild(wrapper);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-// Export PDF (client-side)
-exportBtn.addEventListener('click', async () => {
-  if (!messagesEl.children.length) { alert('No messages'); return; }
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-  let y = 40; pdf.setFontSize(14); pdf.text('Conversation Export', 40, y); y += 20;
-  pdf.setFontSize(11);
-  for (const node of messagesEl.children) {
-    const txt = node.textContent.trim();
-    const lines = pdf.splitTextToSize(txt, 520);
-    if (y + lines.length * 14 > 780) { pdf.addPage(); y = 40; }
-    pdf.text(lines, 40, y); y += lines.length * 14 + 8;
-  }
-  pdf.save(`Conversation_${currentConvKey || 'chat'}.pdf`);
-});
-
-// duration update
+// duration timer
 function updateDuration() {
   if (!conversationStartTime) return;
   const diff = Date.now() - conversationStartTime.getTime();
   const hrs = Math.floor(diff / 3600000), mins = Math.floor((diff % 3600000) / 60000), secs = Math.floor((diff % 60000) / 1000);
-  const pad = n => String(n).padStart(2, '0');
-  durationEl.textContent = `Duration: ${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  durationEl.textContent = `Duration: ${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
   setTimeout(updateDuration, 1000);
 }
 
-// Reset UI
-function resetUI() {
-  currentConvKey = null; currentUserName = null; currentUserRole = null; conversationStartTime = null;
-  lastMessageCount = 0; messagesEl.innerHTML = ''; typingIndicator.textContent = ''; messageInput.value = '';
-  messageInput.disabled = false; sendBtn.disabled = false; exportBtn.style.display = 'none'; chatStatus.innerHTML = '';
-  chatHeader.textContent = 'Not in a conversation'; connStatus.textContent = 'Not connected'; document.title = 'Mock Chat App';
-  if (pollTimer) clearInterval(pollTimer);
-}
-
-// Initialization
-document.addEventListener('DOMContentLoaded', () => {
-  // restore the header title if previously saved
-  const saved = localStorage.getItem('chatTitle');
-  if (saved) { chatHeader.textContent = saved; document.title = saved; }
-
-  // ask for desktop notification permission politely (only if default)
-  if ("Notification" in window && Notification.permission === 'default') {
-    Notification.requestPermission().then(p => console.log('Notification permission:', p));
-  }
-
-  // initial UI state
-  resetUI();
-});
 </script>
+
 </body>
 </html>
+
 
