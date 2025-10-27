@@ -275,6 +275,12 @@ joinConvKey.addEventListener('blur', async () => {
     joinResult.textContent = 'Failed to load names.';
   }
 });
+joinConvKey.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    joinConvKey.blur(); // trigger the blur event manually
+  }
+});
 
 
 // start chat loop
@@ -292,6 +298,13 @@ async function fetchMessages() {
   try {
     const list = await getMessages(currentConvKey);
     if (!Array.isArray(list)) return;
+      // Normalize backend snake_case fields
+      const normalized = list.map(m => ({
+      senderName: m.sender_name || m.senderName,
+      role: m.role,
+      text: m.text,
+      timestamp: m.timestamp
+    }));
     renderMessages(list);
   } catch (err) {
     console.error('fetchMessages error', err);
@@ -339,6 +352,7 @@ function updateDuration() {
 
 </body>
 </html>
+
 
 
 
