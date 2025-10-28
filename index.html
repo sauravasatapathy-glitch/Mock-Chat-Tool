@@ -160,6 +160,15 @@
   </div>
 
 <script type="module">
+  // 🛡️ Protect Chat Screen
+const user = JSON.parse(localStorage.getItem("user") || "null");
+const token = localStorage.getItem("token");
+
+// Allow agent to enter if they have convKey
+if (!user && !localStorage.getItem("convKey")) {
+  window.location.href = "login.html";
+}
+
 import { createConversation, sendMessage, getMessages, getConversation } from "./api.js";
 
 const POLLING_MS = 2000;
@@ -352,6 +361,7 @@ function updateDuration() {
 
 </body>
 </html>
+
 
 
 
