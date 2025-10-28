@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Chat Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .login-container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 320px;
+      text-align: center;
+    }
+    h2 { margin-bottom: 1rem; color: #1e293b; }
+    input, select {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      padding: 0.7rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      width: 100%;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #1e40af;
+    }
+    .toggle {
+      color: #2563eb;
+      cursor: pointer;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .error {
+      color: red;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2 id="loginTitle">Trainer / Admin Login</h2>
+    <div id="error" class="error"></div>
+
+    <div id="trainerAdminFields">
+      <input type="email" id="email" placeholder="Email" />
+      <input type="password" id="password" placeholder="Password" />
+    </div>
+
+    <div id="agentFields" style="display: none;">
+      <input type="text" id="convKey" placeholder="Conversation Key" />
+    </div>
+
+    <button id="loginBtn">Login</button>
+
+    <div class="toggle" id="toggleMode">Login as Agent</div>
+  </div>
+
+  <script type="module" src="./login.js"></script>
+</body>
+</html>
