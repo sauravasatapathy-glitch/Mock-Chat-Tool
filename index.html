@@ -160,6 +160,19 @@
   </div>
 
 <script type="module">
+  import { checkAuth, logout } from "./authGuard.js";
+
+  // ✅ Allow access to all roles (admin, trainer, agent)
+  const auth = checkAuth(["admin", "trainer", "agent"]);
+
+  if (auth) {
+    const { user, role } = auth;
+    document.getElementById("welcomeMsg").textContent = `Welcome, ${user.name}! (${role})`;
+  }
+
+  // 🔘 Hook up logout button
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
   // 🛡️ Protect Chat Screen
 const user = JSON.parse(localStorage.getItem("user") || "null");
 const token = localStorage.getItem("token");
@@ -361,6 +374,7 @@ function updateDuration() {
 
 </body>
 </html>
+
 
 
 
