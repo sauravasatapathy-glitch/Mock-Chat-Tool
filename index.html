@@ -1,396 +1,148 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mock Chat App</title>
-
-  <!-- jsPDF for client-side export (optional) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
+  <meta charset="UTF-8" />
+  <title>Mock Chat Tool</title>
   <style>
-    /* Fonts */
-    body, input, button, select, textarea {
-      font-family: "Calibri", "Verdana", Arial, sans-serif;
-      font-size: 14px;
-      color: #0e1724;
-      -webkit-font-smoothing:antialiased;
+    /* --- Base layout --- */
+    body {
+      margin: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      background: #f9fafb;
+      color: #1e293b;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Layout */
-    * { box-sizing: border-box; }
-    html,body { height:100%; margin:0; background: linear-gradient(180deg,#eef5fb,#fbfdff); }
-    .app { display:flex; gap:18px; max-width:1200px; margin:20px auto; padding:16px; align-items:stretch; }
-
-    /* Left pane */
-    .leftpane {
-      width:340px;
-      background:#f3f6f8; /* light gray sidebar */
-      border-radius:10px;
-      padding:18px;
-      box-shadow: 0 8px 30px rgba(10,30,70,0.06);
-      display:flex; flex-direction:column; gap:12px;
+    header {
+      background: #2563eb;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    .app-title { font-weight:700; color:#0b66d0; font-size:18px; margin-bottom:4px; }
-    .conn-status { color:#445; font-size:13px; }
 
-    .tabs { display:flex; gap:8px; margin-top:8px; }
-    .tab { flex:1; padding:8px; border-radius:8px; border:none; background:#fff; cursor:pointer; font-weight:600; }
-    .tab.active { background:#0b66d0; color:white; }
-
-    label { display:block; margin-top:8px; font-weight:600; color:#23314a; }
-    input[type=text], select { width:100%; padding:9px 10px; border-radius:8px; border:1px solid #dfeaf6; background:#fff; margin-top:6px; }
-
-    .primary { background:#0b66d0; color:#fff; border:none; padding:10px 12px; border-radius:8px; cursor:pointer; }
-    .secondary { background:#fff; border:1px solid #e6eef8; padding:8px 10px; border-radius:8px; cursor:pointer; }
-
-    .muted { color:#3a7; margin-top:8px; font-size:13px; }
-    .error { color:#d9534f; margin-top:8px; font-size:13px; }
-
-    /* Main pane */
-    .mainpane { flex:1; display:flex; flex-direction:column; gap:12px; }
-    .chat-header-main { display:flex; justify-content:space-between; align-items:center; }
-    .chatTitle { font-weight:700; color:#0b2b4a; font-size:16px; }
-    #duration { color:#6b7280; font-size:13px; }
-
-    .chatArea {
-      background:#ffffff;
-      border-radius:10px;
-      padding:16px;
-      box-shadow: 0 8px 30px rgba(10,30,70,0.04);
-      display:flex; flex-direction:column; gap:12px; min-height:520px;
+    header button {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: white;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.4rem;
+      cursor: pointer;
     }
-    .messages { flex:1; overflow:auto; padding:12px; border-radius:8px; background:linear-gradient(180deg,#fcfeff,#f7fbff); border:1px solid rgba(11,102,208,0.03); }
 
-    /* message bubbles */
-    .message { display:block; max-width:72%; padding:10px 12px; margin-bottom:10px; border-radius:12px; box-shadow:0 4px 12px rgba(10,30,60,0.04); clear:both; }
-    .message .meta { font-size:12px; color:#6b7280; margin-bottom:6px; }
-    .message.trainer { background:#0b66d0; color:white; float:left; border-bottom-left-radius:4px; }
-    .message.associate { background:#f1f5f9; color:#0b1220; float:right; border-bottom-right-radius:4px; }
-
-    .system-message { text-align:center; padding:10px; background:#fff5f5; border-radius:8px; color:#d9534f; border:1px solid rgba(217,83,79,0.08); }
-
-    .typingIndicator { color:#6b7280; min-height:18px; font-style:italic; }
-    .chatInputRow { display:flex; gap:8px; align-items:center; }
-    .chatInputRow input { flex:1; padding:11px; border-radius:10px; border:1px solid #e6eef8; }
-    .chatActions { display:flex; gap:8px; align-items:center; margin-top:8px; }
-
-    .footer-note { color:#6b7280; font-size:12px; margin-top:8px; }
-
-    @media (max-width:900px) {
-      .app { flex-direction:column; padding:12px; }
-      .leftpane{ width:100%; }
+    header button:hover {
+      background: rgba(255,255,255,0.3);
     }
+
+    /* --- Main 3-pane layout --- */
+    .app-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 260px 1fr 300px;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* --- Left Pane: Conversations List --- */
+    #leftPane {
+      background: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    #leftPane h3 {
+      margin-top: 0;
+      font-size: 1rem;
+      color: #334155;
+    }
+
+    .conversation-item {
+      padding: 0.6rem 0.8rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 0.5rem;
+    }
+
+    .conversation-item:hover {
+      background: #f1f5f9;
+    }
+
+    .conversation-item.active {
+      background: #e0f2fe;
+      border-left: 3px solid #2563eb;
+    }
+
+    /* --- Center Pane: Chat Area --- */
+    #chatArea {
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1rem;
+    }
+
+    #chatMessages {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+    }
+
+    /* --- Right Pane: Conversation Details --- */
+    #rightPane {
+      background: #ffffff;
+      border-left: 1px solid #e2e8f0;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    #rightPane h3 {
+      margin-top: 0;
+      font-size: 1rem;
+      color: #334155;
+    }
+
+    /* --- Utility --- */
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem;">
-  <h3 id="welcomeMsg" style="color:#1e293b; margin:0;"></h3>
-  <button id="logoutBtn" style="
-    background:#ef4444;
-    color:#fff;
-    border:none;
-    padding:0.5rem 1rem;
-    border-radius:0.5rem;
-    cursor:pointer;">
-    Logout
-  </button>
-  </div>
+  <header>
+    <div>Mock Chat Tool</div>
+    <button id="logoutBtn">Logout</button>
+  </header>
 
-  <div class="app">
-    <!-- LEFT PANE -->
-    <aside class="leftpane">
-      <div>
-        <div class="app-title">Mock Chat App</div>
-        <div id="connStatus" class="conn-status">Not connected</div>
-      </div>
-
-      <div class="tabs" style="margin-top:10px;">
-        <button id="tabCreate" class="tab active">Create</button>
-        <button id="tabJoin" class="tab">Join</button>
-      </div>
-
-      <!-- Create area -->
-      <div id="createArea" class="panel-body">
-        <label>Trainer name</label>
-        <input id="trainerName" type="text" placeholder="e.g. Tom" />
-        <label>Associate name</label>
-        <input id="associateName" type="text" placeholder="e.g. Rob" />
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button id="createBtn" class="primary">Create Conversation</button>
-        </div>
-        <div id="createResult" class="muted" aria-live="polite"></div>
-      </div>
-
-      <!-- Join area -->
-      <div id="joinArea" class="panel-body hidden">
-        <label>Conversation Key</label>
-        <input id="joinConvKey" type="text" placeholder="Enter conversation key" />
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button id="joinBtn" class="primary">Join</button>
-        </div>
-
-        <label style="margin-top:12px">Select Participant</label>
-        <select id="joinNameSelect">
-          <option value="">-- Select Participant --</option>
-        </select>
-
-        <div id="joinResult" class="error" aria-live="polite"></div>
-      </div>
-
-      <div style="flex:1"></div>
-
-      <div class="footer-note">
-        <div>Frontend: GitHub Pages</div>
-        <div>Backend: Google Apps Script (proxied)</div>
-      </div>
+  <div class="app-layout">
+    <!-- Left Pane -->
+    <aside id="leftPane">
+      <h3>My Conversations</h3>
+      <div id="conversationList"></div>
     </aside>
 
-    <!-- MAIN CHAT AREA -->
-    <main class="mainpane">
-      <div class="chat-header-main">
-        <div id="chatHeader" class="chatTitle">Not in a conversation</div>
-        <div id="duration">Duration: 00:00:00</div>
+    <!-- Center Chat Area -->
+    <main id="chatArea">
+      <div id="chatMessages">Select a conversation to start chatting.</div>
+      <div id="chatInputArea" class="hidden">
+        <input type="text" id="chatInput" placeholder="Type a message..." style="width: 80%; padding: 0.5rem;">
+        <button id="sendBtn" style="padding: 0.5rem;">Send</button>
       </div>
-
-      <section class="chatArea">
-        <div id="messages" class="messages" aria-live="polite"></div>
-
-        <div id="chatStatus" class="chatStatus"></div>
-        <div id="typingIndicator" class="typingIndicator"></div>
-
-        <div class="chatInputRow">
-          <input id="messageInput" type="text" placeholder="Type your message..." autocomplete="off" />
-          <button id="sendBtn" class="primary">Send</button>
-        </div>
-
-        <div class="chatActions">
-          <button id="exportBtn" class="secondary" style="display:none">Export PDF</button>
-          <div id="chatResult" class="muted"></div>
-        </div>
-      </section>
     </main>
+
+    <!-- Right Pane -->
+    <aside id="rightPane">
+      <h3>Conversation Details</h3>
+      <div id="convDetails">
+        <p>Select a conversation to view details.</p>
+      </div>
+    </aside>
   </div>
 
-<script type="module">
-  import { checkAuth, logout } from "./authGuard.js";
-
-  // ✅ Allow access to all roles (admin, trainer, agent)
-  const auth = checkAuth(["admin", "trainer", "agent"]);
-
-  if (auth) {
-    const { user, role } = auth;
-    document.getElementById("welcomeMsg").textContent = `Welcome, ${user.name}! (${role})`;
-  }
-
-  // 🔘 Hook up logout button
-  document.getElementById("logoutBtn").addEventListener("click", logout);
-
-  // 🛡️ Protect Chat Screen
-const user = JSON.parse(localStorage.getItem("user") || "null");
-const token = localStorage.getItem("token");
-
-// Allow agent to enter if they have convKey
-if (!user && !localStorage.getItem("convKey")) {
-  window.location.href = "login.html";
-}
-
-import { createConversation, sendMessage, getMessages, getConversation } from "./api.js";
-
-const POLLING_MS = 2000;
-const $ = id => document.getElementById(id);
-
-const tabCreate = $('tabCreate'), tabJoin = $('tabJoin');
-const createArea = $('createArea'), joinArea = $('joinArea');
-const trainerName = $('trainerName'), associateName = $('associateName');
-const createBtn = $('createBtn'), createResult = $('createResult');
-const joinConvKey = $('joinConvKey'), loadNamesBtn = $('loadNamesBtn'), joinBtn = $('joinBtn');
-const joinNameSelect = $('joinNameSelect'), joinResult = $('joinResult');
-const connStatus = $('connStatus');
-const chatHeader = $('chatHeader'), durationEl = $('duration');
-const messagesEl = $('messages'), typingIndicator = $('typingIndicator');
-const messageInput = $('messageInput'), sendBtn = $('sendBtn');
-const exportBtn = $('exportBtn'), chatStatus = $('chatStatus');
-
-let currentConvKey = null, currentUserName = null, currentUserRole = null, conversationStartTime = null;
-let lastMessageCount = 0, pollTimer = null, sendingInProgress = false;
-
-// tab switching
-tabCreate.addEventListener('click', () => {
-  tabCreate.classList.add('active'); tabJoin.classList.remove('active');
-  createArea.classList.remove('hidden'); joinArea.classList.add('hidden');
-});
-tabJoin.addEventListener('click', () => {
-  tabJoin.classList.add('active'); tabCreate.classList.remove('active');
-  joinArea.classList.remove('hidden'); createArea.classList.add('hidden');
-});
-
-// create conversation
-createBtn.addEventListener('click', async () => {
-  const t = trainerName.value.trim(), a = associateName.value.trim();
-  if (!t || !a) return createResult.textContent = 'Please enter both names';
-  createResult.textContent = 'Creating...';
-  try {
-    const out = await createConversation(t, a);
-    if (!out.convKey) throw new Error('Failed to create conversation');
-    currentConvKey = out.convKey;
-    currentUserName = t;
-    currentUserRole = 'trainer';
-    conversationStartTime = new Date();
-    chatHeader.textContent = `${t} (Trainer) | ${a}`;
-    connStatus.textContent = `Key: ${out.convKey}`;
-    createResult.textContent = `Created: ${out.convKey}`;
-    startChat();
-  } catch (e) {
-    console.error(e);
-    createResult.textContent = e.message;
-  }
-});
-
-// join conversation
-joinBtn.addEventListener('click', async () => {
-  const key = joinConvKey.value.trim();
-  const name = (joinNameSelect.value || '').split('|')[0];
-  if (!key || !name) return joinResult.textContent = 'Enter key and name';
-
-  try {
-    const conv = await getConversation(key);
-    if (!conv || conv.error) {
-      joinResult.textContent = 'Conversation not found';
-      return;
-    }
-
-    // 🧠 Normalize DB response to camelCase
-    const normalizedConv = {
-      convKey: conv.conv_key,
-      trainerName: conv.trainer_name,
-      associateName: conv.associate_name,
-      startTime: conv.start_time,
-      ended: conv.ended
-    };
-
-    currentConvKey = key;
-    currentUserName = name;
-    currentUserRole =
-      normalizedConv.trainerName.toLowerCase() === name.toLowerCase()
-        ? 'trainer'
-        : 'associate';
-    chatHeader.textContent = `${normalizedConv.trainerName} (Trainer) | ${normalizedConv.associateName}`;
-    connStatus.textContent = `Key: ${key}`;
-    conversationStartTime = normalizedConv.startTime ? new Date(normalizedConv.startTime) : new Date();
-    joinResult.textContent = 'Joined successfully.';
-    startChat();
-  } catch (err) {
-    console.error(err);
-    joinResult.textContent = 'Error joining conversation';
-  }
-});
-  // Auto-load participant names when conversation key input loses focus
-joinConvKey.addEventListener('blur', async () => {
-  const key = joinConvKey.value.trim();
-  if (!key) return; // skip if empty
-
-  try {
-    const conv = await getConversation(key);
-    if (!conv || conv.error) {
-      joinResult.textContent = 'Conversation not found';
-      joinNameSelect.innerHTML = `<option value="">-- Select Participant --</option>`;
-      return;
-    }
-
-    joinNameSelect.innerHTML = `
-      <option value="">-- Select Participant --</option>
-      <option value="${conv.trainer_name}">Trainer: ${conv.trainer_name}</option>
-      <option value="${conv.associate_name}">Associate: ${conv.associate_name}</option>
-    `;
-
-    joinResult.textContent = 'Names loaded automatically.';
-  } catch (err) {
-    console.error('Error fetching conversation:', err);
-    joinResult.textContent = 'Failed to load names.';
-  }
-});
-joinConvKey.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    joinConvKey.blur(); // trigger the blur event manually
-  }
-});
-
-
-// start chat loop
-function startChat() {
-  if (pollTimer) clearInterval(pollTimer);
-  fetchMessages();
-  pollTimer = setInterval(fetchMessages, POLLING_MS);
-  exportBtn.style.display = 'inline-block';
-  updateDuration();
-}
-
-// fetch messages
-async function fetchMessages() {
-  if (!currentConvKey) return;
-  try {
-    const list = await getMessages(currentConvKey);
-    if (!Array.isArray(list)) return;
-      // Normalize backend snake_case fields
-      const normalized = list.map(m => ({
-      senderName: m.sender_name || m.senderName,
-      role: m.role,
-      text: m.text,
-      timestamp: m.timestamp
-    }));
-    renderMessages(list);
-  } catch (err) {
-    console.error('fetchMessages error', err);
-  }
-}
-
-// render
-function renderMessages(messages) {
-  messagesEl.innerHTML = '';
-  for (const msg of messages) {
-    const div = document.createElement('div');
-    div.className = 'message ' + (msg.role === 'trainer' ? 'trainer' : 'associate');
-    div.innerHTML = `<div class="meta">${msg.senderName} • ${new Date(msg.timestamp).toLocaleTimeString()}</div><div>${msg.text}</div>`;
-    messagesEl.appendChild(div);
-  }
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-// send message
-sendBtn.addEventListener('click', sendMsg);
-messageInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
-
-async function sendMsg() {
-  const txt = messageInput.value.trim();
-  if (!txt || !currentConvKey) return;
-  messageInput.value = '';
-  try {
-    await sendMessage(currentConvKey, currentUserName, currentUserRole, txt);
-    await fetchMessages();
-  } catch (err) {
-    alert('Send failed: ' + err.message);
-  }
-}
-
-// duration timer
-function updateDuration() {
-  if (!conversationStartTime) return;
-  const diff = Date.now() - conversationStartTime.getTime();
-  const hrs = Math.floor(diff / 3600000), mins = Math.floor((diff % 3600000) / 60000), secs = Math.floor((diff % 60000) / 1000);
-  durationEl.textContent = `Duration: ${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-  setTimeout(updateDuration, 1000);
-}
-
-</script>
-
+  <script type="module" src="./index.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
