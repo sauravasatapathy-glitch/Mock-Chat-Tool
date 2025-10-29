@@ -1,36 +1,39 @@
-// login.js
 const API_BASE_URL = "https://mock-chat-backend.vercel.app/api";
 
+// === Redirect logged-in users away from login page ===
+const existingToken = localStorage.getItem("token");
+if (existingToken) {
+  window.location.href = "index.html";
+}
+
+const loginBtn = document.getElementById("loginBtn");
+const toggleModeBtn = document.getElementById("toggleMode");
 const emailEl = document.getElementById("email");
 const passwordEl = document.getElementById("password");
 const convKeyEl = document.getElementById("convKey");
-const loginBtn = document.getElementById("loginBtn");
-const toggleMode = document.getElementById("toggleMode");
-const loginTitle = document.getElementById("loginTitle");
 const errorEl = document.getElementById("error");
 const trainerAdminFields = document.getElementById("trainerAdminFields");
 const agentFields = document.getElementById("agentFields");
+const loginTitle = document.getElementById("loginTitle");
 
 let isAgentMode = false;
 
-// 🔁 Toggle between Agent and Trainer/Admin mode
-toggleMode.addEventListener("click", () => {
+// === Toggle between Agent / Trainer-Admin Login ===
+toggleModeBtn.addEventListener("click", () => {
   isAgentMode = !isAgentMode;
   if (isAgentMode) {
-    loginTitle.textContent = "Agent Login";
     trainerAdminFields.style.display = "none";
     agentFields.style.display = "block";
-    toggleMode.textContent = "Login as Trainer / Admin";
+    loginTitle.textContent = "Agent Login";
+    toggleModeBtn.textContent = "Login as Trainer/Admin";
   } else {
-    loginTitle.textContent = "Trainer / Admin Login";
     trainerAdminFields.style.display = "block";
     agentFields.style.display = "none";
-    toggleMode.textContent = "Login as Agent";
+    loginTitle.textContent = "Trainer / Admin Login";
+    toggleModeBtn.textContent = "Login as Agent";
   }
-  errorEl.textContent = "";
 });
 
-// 🚀 Handle Login
 loginBtn.addEventListener("click", async () => {
   errorEl.textContent = "";
 
@@ -40,7 +43,7 @@ loginBtn.addEventListener("click", async () => {
       const convKey = convKeyEl.value.trim();
       if (!convKey) return (errorEl.textContent = "Enter conversation key.");
 
-      // validate conversation exists
+      // Validate conversation exists
       const res = await fetch(`${API_BASE_URL}/conversation?convKey=${convKey}`);
       const data = await res.json();
 
@@ -48,15 +51,19 @@ loginBtn.addEventListener("click", async () => {
         return (errorEl.textContent = "Invalid or expired conversation key.");
       }
 
-      // Store key and role locally
+      // Store info locally
       localStorage.setItem("role", "agent");
       localStorage.setItem("convKey", convKey);
-      localStorage.setItem("user", JSON.stringify({
-        name: data.associate_name,
-        role: "agent"
-      }));
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          name: data.associate_name || "Agent",
+          role: "agent",
+        })
+      );
 
-      window.location.href = "index.html";
+      // Redirect for agent
+      window.location.href = "index.html?role=agent";
     } else {
       // === Trainer/Admin Login ===
       const email = emailEl.value.trim();
@@ -73,12 +80,17 @@ loginBtn.addEventListener("click", async () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed.");
 
-      // Store JWT and user info
+      // Store JWT + user info
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("role", data.user.role);
 
-      window.location.href = "index.html";
+      // Redirect based on role
+      if (data.user.role === "agent") {
+        window.location.href = "index.html?role=agent";
+      } else {
+        window.location.href = "index.html";
+      }
     }
   } catch (err) {
     console.error(err);
