@@ -1,133 +1,187 @@
-const API_BASE_URL = "https://mock-chat-backend.vercel.app/api"; // update to your deployed backend
-const role = localStorage.getItem("role");
-const user = JSON.parse(localStorage.getItem("user"));
-const leftPane = document.getElementById("leftPane");
-const rightPane = document.getElementById("rightPane");
-const conversationList = document.getElementById("conversationList");
-const convDetails = document.getElementById("convDetails");
-const chatMessages = document.getElementById("chatMessages");
-const chatInputArea = document.getElementById("chatInputArea");
-const chatInput = document.getElementById("chatInput");
-const sendBtn = document.getElementById("sendBtn");
+import { getUserFromToken, getAuthHeader } from "./authHelper.js";
+import { checkAuth, logout } from "./authGuard.js";
 
-let activeConv = null;
+const API_BASE_URL = "https://mock-chat-backend.vercel.app/api"; // 🟦 Update this to your backend URL
 
-// === Role-based layout ===
+// === DOM Elements ===
+const leftPane = document.getElementById("left-pane");
+const rightPane = document.getElementById("right-pane");
+const chatContent = document.getElementById("chatContent");
+const newChatBtn = document.getElementById("newChatBtn");
+
+// === Auth Check ===
+const session = checkAuth(["admin", "trainer", "agent"]);
+if (!session) return;
+
+const { user, token, role } = session;
+const authHeader = getAuthHeader();
+
+// === Role-based Layout ===
 if (role === "agent") {
-  leftPane.classList.add("hidden");
-  rightPane.classList.add("hidden");
+  // Agents don’t create conversations
+  rightPane.style.display = "none";
+} else {
+  // Trainers/Admins can start new chats
+  newChatBtn.addEventListener("click", () => {
+    const associate = prompt("Enter associate name:");
+    if (associate) createConversation(user.name, associate);
+  });
 }
 
-// === Logout ===
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  localStorage.clear();
-  window.location.href = "login.html";
-});
+// === Load Conversations on Startup ===
+loadConversations();
 
-// === Fetch conversations for trainer/admin ===
+// === Logout Button (Optional) ===
+const logoutBtn = document.createElement("button");
+logoutBtn.textContent = "Logout";
+logoutBtn.style.cssText =
+  "margin:0.5rem;padding:0.4rem 0.8rem;background:#dc2626;color:white;border:none;border-radius:0.5rem;cursor:pointer;";
+logoutBtn.onclick = logout;
+document.body.appendChild(logoutBtn);
+
+// ========================================================
+// === FUNCTIONS ===========================================
+// ========================================================
+
+// 🟦 Fetch all conversations (filtered by user & role)
 async function loadConversations() {
-  if (role === "trainer" || role === "admin") {
-    const res = await fetch(`${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`);
-    const data = await res.json();
-
-    conversationList.innerHTML = "";
-    if (!res.ok || !data.length) {
-      conversationList.innerHTML = "<p>No conversations found.</p>";
-      return;
-    }
-
-    data.forEach(conv => {
-      const item = document.createElement("div");
-      item.className = "conversation-item";
-      item.dataset.key = conv.conv_key;
-      item.innerHTML = `<strong>${conv.associate_name}</strong><br><small>${new Date(conv.start_time).toLocaleString()}</small>`;
-      item.addEventListener("click", () => selectConversation(conv));
-      conversationList.appendChild(item);
+  try {
+    const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
+      headers: { ...authHeader },
     });
+    const conversations = await res.json();
+
+    if (!res.ok) throw new Error(conversations.error || "Failed to load");
+
+    const myConversations =
+      role === "agent"
+        ? conversations.filter((c) => c.associate_name === user.name)
+        : conversations.filter((c) => c.trainer_name === user.name);
+
+    const activeConversations = conversations.filter((c) => !c.ended);
+
+    renderList("myConversations", myConversations, "No conversations yet");
+    renderList("activeConversations", activeConversations, "No active chats");
+  } catch (err) {
+    console.error("Error loading conversations:", err);
   }
 }
 
-// === Select conversation ===
-async function selectConversation(conv) {
-  document.querySelectorAll(".conversation-item").forEach(i => i.classList.remove("active"));
-  const active = document.querySelector(`[data-key="${conv.conv_key}"]`);
-  active.classList.add("active");
-  activeConv = conv;
+// 🟦 Render left/right pane lists
+function renderList(id, items, emptyText) {
+  const list = document.getElementById(id);
+  list.innerHTML = "";
 
-  chatMessages.innerHTML = `<p style="color:#64748b;">Loading messages...</p>`;
-  chatInputArea.classList.remove("hidden");
+  if (!items.length) {
+    list.innerHTML = `<li>${emptyText}</li>`;
+    return;
+  }
 
-  // Load conversation details
-  convDetails.innerHTML = `
-    <p><strong>Key:</strong> ${conv.conv_key}</p>
-    <p><strong>Trainer:</strong> ${conv.trainer_name}</p>
-    <p><strong>Agent:</strong> ${conv.associate_name}</p>
-    <p><strong>Started:</strong> ${new Date(conv.start_time).toLocaleString()}</p>
-    <p><strong>Status:</strong> ${conv.ended ? "Ended" : "Active"}</p>
+  items.forEach((conv) => {
+    const li = document.createElement("li");
+    li.textContent = `${conv.trainer_name} ↔ ${conv.associate_name} (${conv.conv_key})`;
+    li.onclick = () => openConversation(conv);
+    list.appendChild(li);
+  });
+}
+
+// 🟦 Create new conversation (trainer/admin)
+async function createConversation(trainerName, associateName) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/conversations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader },
+      body: JSON.stringify({ trainerName, associateName }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to create conversation");
+
+    alert(`✅ Conversation created: ${data.convKey}`);
+    loadConversations();
+  } catch (err) {
+    alert("Error creating conversation: " + err.message);
+  }
+}
+
+// 🟦 Open conversation
+async function openConversation(conv) {
+  chatContent.innerHTML = `
+    <h3>${conv.trainer_name} ↔ ${conv.associate_name}</h3>
+    <p><b>Conversation Key:</b> ${conv.conv_key}</p>
+    <div id="messages" style="flex:1;overflow-y:auto;margin-top:1rem;padding:0.5rem;border:1px solid #ddd;border-radius:0.5rem;background:#fff;height:300px;"></div>
+    <div style="display:flex;margin-top:1rem;">
+      <input id="chatInput" placeholder="Type a message..." style="flex:1;padding:0.6rem;border:1px solid #ccc;border-radius:0.5rem 0 0 0.5rem;" />
+      <button id="sendBtn" style="padding:0.6rem 1rem;background:#2563eb;color:white;border:none;border-radius:0 0.5rem 0.5rem 0;cursor:pointer;">Send</button>
+    </div>
   `;
 
   await loadMessages(conv.conv_key);
+
+  document.getElementById("sendBtn").addEventListener("click", async () => {
+    const input = document.getElementById("chatInput");
+    const text = input.value.trim();
+    if (!text) return;
+
+    await sendMessage(conv.conv_key, user.name, role, text);
+    input.value = "";
+    await loadMessages(conv.conv_key);
+  });
 }
 
-// === Load messages ===
+// 🟦 Fetch messages for a conversation
 async function loadMessages(convKey) {
-  const res = await fetch(`${API_BASE_URL}/messages?convKey=${convKey}`);
-  const data = await res.json();
-  if (!res.ok) return console.error("Failed to load messages:", data);
+  try {
+    const res = await fetch(`${API_BASE_URL}/messages?convKey=${convKey}`, {
+      headers: { ...authHeader },
+    });
+    const messages = await res.json();
+    if (!res.ok) throw new Error(messages.error || "Failed to load messages");
 
-  renderMessages(data);
-}
+    const container = document.getElementById("messages");
+    container.innerHTML = "";
 
-// === Render messages ===
-function renderMessages(messages) {
-  chatMessages.innerHTML = "";
-  messages.forEach(msg => {
-    const msgDiv = document.createElement("div");
-    msgDiv.style.margin = "0.5rem 0";
-    msgDiv.style.textAlign = msg.role === role ? "right" : "left";
-    msgDiv.innerHTML = `
-      <div style="display:inline-block; background:${msg.role === role ? "#2563eb" : "#e2e8f0"}; 
-                  color:${msg.role === role ? "white" : "#1e293b"}; 
-                  padding:0.5rem 0.75rem; border-radius:0.75rem; max-width:70%;">
-        <strong>${msg.sender}</strong><br>${msg.text}
-      </div>
-    `;
-    chatMessages.appendChild(msgDiv);
-  });
+    messages.forEach((msg) => {
+      const msgDiv = document.createElement("div");
+      msgDiv.style.margin = "0.5rem 0";
+      msgDiv.style.textAlign = msg.role === role ? "right" : "left";
+      msgDiv.innerHTML = `
+        <div style="display:inline-block;background:${
+          msg.role === role ? "#2563eb" : "#e2e8f0"
+        };color:${msg.role === role ? "white" : "#1e293b"};padding:0.5rem 0.75rem;
+                  border-radius:0.75rem;max-width:70%;">
+          <strong>${msg.sender_name || msg.sender}</strong><br>${msg.text}
+        </div>
+      `;
+      container.appendChild(msgDiv);
+    });
 
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// === Send message ===
-sendBtn.addEventListener("click", async () => {
-  const text = chatInput.value.trim();
-  if (!text || !activeConv) return;
-
-  const payload = {
-    convKey: activeConv.conv_key,
-    sender: user.name,
-    role,
-    text,
-  };
-
-  const res = await fetch(`${API_BASE_URL}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-  if (res.ok) {
-    chatInput.value = "";
-    await loadMessages(activeConv.conv_key);
-  } else {
-    console.error("Error sending message:", data);
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    console.error("Error loading messages:", err);
   }
-});
+}
 
-// === Optional Auto Refresh (every 5 sec) ===
+// 🟦 Send message
+async function sendMessage(convKey, senderName, senderRole, message) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader },
+      body: JSON.stringify({ convKey, senderName, senderRole, message }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to send message");
+  } catch (err) {
+    console.error("Send message error:", err);
+  }
+}
+
+// 🟦 Optional auto-refresh every 5s
 setInterval(() => {
-  if (activeConv) loadMessages(activeConv.conv_key);
+  const messagesBox = document.getElementById("messages");
+  if (messagesBox && messagesBox.dataset.convKey) {
+    loadMessages(messagesBox.dataset.convKey);
+  }
 }, 5000);
-
-loadConversations();
