@@ -2,145 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mock Chat Tool</title>
+  <title>Mock Chat Dashboard</title>
   <style>
-    /* --- Base layout --- */
     body {
+      font-family: Arial, sans-serif;
       margin: 0;
-      font-family: 'Inter', Arial, sans-serif;
-      background: #f9fafb;
-      color: #1e293b;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      background: #2563eb;
-      color: white;
-      padding: 0.75rem 1.5rem;
-      font-size: 1.25rem;
-      font-weight: 600;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    header button {
-      background: rgba(255,255,255,0.15);
-      border: none;
-      color: white;
-      padding: 0.4rem 0.8rem;
-      border-radius: 0.4rem;
-      cursor: pointer;
-    }
-
-    header button:hover {
-      background: rgba(255,255,255,0.3);
-    }
-
-    /* --- Main 3-pane layout --- */
-    .app-layout {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 260px 1fr 300px;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    /* --- Left Pane: Conversations List --- */
-    #leftPane {
-      background: #ffffff;
-      border-right: 1px solid #e2e8f0;
-      overflow-y: auto;
-      padding: 1rem;
-    }
-
-    #leftPane h3 {
-      margin-top: 0;
-      font-size: 1rem;
-      color: #334155;
-    }
-
-    .conversation-item {
-      padding: 0.6rem 0.8rem;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      transition: background 0.2s;
-      margin-bottom: 0.5rem;
-    }
-
-    .conversation-item:hover {
-      background: #f1f5f9;
-    }
-
-    .conversation-item.active {
-      background: #e0f2fe;
-      border-left: 3px solid #2563eb;
-    }
-
-    /* --- Center Pane: Chat Area --- */
-    #chatArea {
       background: #f8fafc;
       display: flex;
+      height: 100vh;
+    }
+
+    #left-pane, #right-pane {
+      width: 20%;
+      background: #fff;
+      border-right: 1px solid #ddd;
+      display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      padding: 1rem;
+      overflow-y: auto;
     }
 
-    #chatMessages {
+    #right-pane { border-left: 1px solid #ddd; border-right: none; }
+
+    #chat-pane {
       flex: 1;
-      overflow-y: auto;
-      margin-bottom: 1rem;
-    }
-
-    /* --- Right Pane: Conversation Details --- */
-    #rightPane {
-      background: #ffffff;
-      border-left: 1px solid #e2e8f0;
       padding: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h3 {
+      background: #2563eb;
+      color: white;
+      padding: 0.75rem;
+      margin: 0;
+      text-align: center;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      padding: 0.6rem;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+
+    li:hover {
+      background: #e0ecff;
+    }
+
+    #chatContent {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-top: 1rem;
+      background: #fff;
       overflow-y: auto;
     }
 
-    #rightPane h3 {
-      margin-top: 0;
-      font-size: 1rem;
-      color: #334155;
+    #newChatBtn {
+      margin: 0.5rem;
+      padding: 0.5rem;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
     }
 
-    /* --- Utility --- */
-    .hidden { display: none !important; }
+    #newChatBtn:hover {
+      background: #1e40af;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div>Mock Chat Tool</div>
-    <button id="logoutBtn">Logout</button>
-  </header>
+  <div id="left-pane">
+    <h3>Active Conversations</h3>
+    <ul id="activeConversations"></ul>
+  </div>
 
-  <div class="app-layout">
-    <!-- Left Pane -->
-    <aside id="leftPane">
-      <h3>My Conversations</h3>
-      <div id="conversationList"></div>
-    </aside>
+  <div id="chat-pane">
+    <h2>Welcome to Mock Chat Tool</h2>
+    <div id="chatContent">Select or create a conversation.</div>
+  </div>
 
-    <!-- Center Chat Area -->
-    <main id="chatArea">
-      <div id="chatMessages">Select a conversation to start chatting.</div>
-      <div id="chatInputArea" class="hidden">
-        <input type="text" id="chatInput" placeholder="Type a message..." style="width: 80%; padding: 0.5rem;">
-        <button id="sendBtn" style="padding: 0.5rem;">Send</button>
-      </div>
-    </main>
-
-    <!-- Right Pane -->
-    <aside id="rightPane">
-      <h3>Conversation Details</h3>
-      <div id="convDetails">
-        <p>Select a conversation to view details.</p>
-      </div>
-    </aside>
+  <div id="right-pane">
+    <h3>Your Conversations</h3>
+    <button id="newChatBtn">+ New Chat</button>
+    <ul id="myConversations"></ul>
   </div>
 
   <script type="module" src="./index.js"></script>
