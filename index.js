@@ -135,6 +135,41 @@ if (!session) {
       await loadMessages(conv.conv_key);
     });
   }
+// 🟩 Setup live updates using SSE
+function subscribeToMessages(convKey) {
+  if (window.eventSource) {
+    window.eventSource.close();
+  }
+
+  const url = `${API_BASE_URL}/stream?convKey=${convKey}`;
+  const eventSource = new EventSource(url);
+  window.eventSource = eventSource;
+
+  eventSource.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const messagesBox = document.getElementById("messages");
+    if (!messagesBox) return;
+
+    const msgDiv = document.createElement("div");
+    msgDiv.style.margin = "0.5rem 0";
+    msgDiv.style.textAlign = msg.role === role ? "right" : "left";
+    msgDiv.innerHTML = `
+      <div style="display:inline-block;background:${
+        msg.role === role ? "#2563eb" : "#e2e8f0"
+      };color:${msg.role === role ? "white" : "#1e293b"};padding:0.5rem 0.75rem;
+                border-radius:0.75rem;max-width:70%;">
+        <strong>${msg.sender_name}</strong><br>${msg.text}
+      </div>
+    `;
+    messagesBox.appendChild(msgDiv);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  };
+
+  eventSource.onerror = () => {
+    console.warn("🔌 SSE disconnected. Retrying in 5s...");
+    setTimeout(() => subscribeToMessages(convKey), 5000);
+  };
+}
 
   // 🟦 Fetch messages
   async function loadMessages(convKey) {
