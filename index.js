@@ -221,10 +221,10 @@ function subscribeToMessages(convKey) {
   }
 
   // 🟦 Auto-refresh every 5s
-  setInterval(() => {
+  /*setInterval(() => {
     const messagesBox = document.getElementById("messages");
     if (messagesBox && messagesBox.dataset.convKey) {
       loadMessages(messagesBox.dataset.convKey);
     }
-  }, 5000);
+  }, 5000);*/
 }
