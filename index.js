@@ -210,7 +210,12 @@ function subscribeToMessages(convKey) {
       const res = await fetch(`${API_BASE_URL}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ convKey, senderName, senderRole, message }),
+        body: JSON.stringify({
+        convKey: convKey,
+        senderName: username,
+        senderRole: role,
+        text: text
+        }),
       });
 
       const data = await res.json();
