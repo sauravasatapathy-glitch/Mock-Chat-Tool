@@ -205,25 +205,34 @@ function subscribeToMessages(convKey) {
   }
 
   // 🟦 Send message
-  async function sendMessage(convKey, senderName, senderRole, message) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({
-        convKey: convKey,
+async function sendMessage(convKey, text) {
+  const username = localStorage.getItem("username") || "Unknown User";
+  const role = localStorage.getItem("role") || "agent";
+
+  try {
+    const res = await fetch("https://mock-chat-backend.vercel.app/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        convKey,
         senderName: username,
         senderRole: role,
-        text: text
-        }),
-      });
+        text
+      })
+    });
 
+    if (!res.ok) {
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send message");
-    } catch (err) {
-      console.error("Send message error:", err);
+      throw new Error(data.error || "Failed to send message");
     }
+
+    console.log("Message sent!");
+  } catch (err) {
+    console.error("Send message error:", err);
+    alert("Error sending message: " + err.message);
   }
+}
+
 
   // 🟦 Auto-refresh every 5s
   /*setInterval(() => {
