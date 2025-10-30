@@ -13,6 +13,12 @@ const agentFields = document.getElementById("agentFields");
 
 let isAgentMode = false;
 
+// Prevent logged-in users from accessing login page
+const existingUser = localStorage.getItem("user");
+if (existingUser) {
+  window.location.href = "index.html";
+}
+
 // === Toggle Login Mode ===
 toggleMode.addEventListener("click", () => {
   isAgentMode = !isAgentMode;
