@@ -87,8 +87,23 @@
 
   <div id="chat-pane">
     <h2>Welcome to Mock Chat Tool</h2>
-    <div id="chatContent">Select or create a conversation.</div>
-  </div>
+<div id="chatContent">Select or create a conversation.</div>
+
+<!-- 🟢 Message Input Bar -->
+<div id="messageBox" style="display: flex; margin-top: 1rem;">
+  <input
+    id="messageInput"
+    type="text"
+    placeholder="Type a message..."
+    style="flex: 1; padding: 0.6rem; border: 1px solid #ccc; border-radius: 0.5rem;"
+  />
+  <button
+    id="sendBtn"
+    style="margin-left: 0.5rem; padding: 0.6rem 1rem; background: #2563eb; color: white; border: none; border-radius: 0.5rem; cursor: pointer;"
+  >
+    Send
+  </button>
+</div>
 
   <div id="right-pane">
     <h3>Your Conversations</h3>
@@ -99,3 +114,4 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
