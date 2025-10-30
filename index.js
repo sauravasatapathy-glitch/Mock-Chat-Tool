@@ -9,6 +9,13 @@ const rightPane = document.getElementById("right-pane");
 const chatContent = document.getElementById("chatContent");
 const newChatBtn = document.getElementById("newChatBtn");
 
+// Load user details from localStorage
+const storedUser = JSON.parse(localStorage.getItem("user"));
+const username = storedUser?.name || "Unknown User";
+const role = localStorage.getItem("role") || "unknown";
+const token = localStorage.getItem("token");
+
+
 // === Auth Check ===
 const session = checkAuth(["admin", "trainer", "agent"]);
 if (!session) {
@@ -205,33 +212,33 @@ function subscribeToMessages(convKey) {
   }
 
   // 🟦 Send message
-async function sendMessage(convKey, text) {
-  const username = localStorage.getItem("username") || "Unknown User";
-  const role = localStorage.getItem("role") || "agent";
+async function sendMessage() {
+  const messageText = document.getElementById("messageInput").value.trim();
+  if (!messageText) return;
+
+  const convKey = selectedConversationKey;
+  const senderName = username;
+  const senderRole = role;
 
   try {
-    const res = await fetch("https://mock-chat-backend.vercel.app/api/messages", {
+    const response = await fetch(`${API_BASE_URL}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        convKey,
-        senderName: username,
-        senderRole: role,
-        text
-      })
+      body: JSON.stringify({ convKey, senderName, senderRole, text: messageText }),
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || "Failed to send message");
-    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to send message");
 
     console.log("Message sent!");
+    document.getElementById("messageInput").value = "";
+    loadMessages(convKey);
   } catch (err) {
     console.error("Send message error:", err);
     alert("Error sending message: " + err.message);
   }
 }
+
 
 
   // 🟦 Auto-refresh every 5s
