@@ -314,32 +314,24 @@ function renderMessage(container, msg) {
 
 
 // 🟦 Subscribe to live updates (SSE)
-function subscribeToMessages(convKey, onMessageReceived) {
-  if (window.currentEventSource) window.currentEventSource.close();
-
-  const evtSource = new EventSource(`${API_BASE_URL}/stream?convKey=${convKey}`, {
-    withCredentials: true,
-  });
+function subscribeToMessages(convKey) {
+  const evtSource = new EventSource(
+    `${API_BASE_URL}/stream?convKey=${convKey}`,
+    { withCredentials: true }
+  );
 
   evtSource.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg?.text) onMessageReceived(msg);
-    } catch (err) {
-      console.error("SSE parse error:", err);
+    const data = JSON.parse(event.data);
+    if (data.type === "new") {
+      for (const msg of data.messages) appendMessage(msg);
     }
   };
-
-  evtSource.addEventListener("ping", () => {
-    // Keep alive ping from server
-  });
 
   evtSource.onerror = (err) => {
     console.warn("SSE disconnected. Retrying in 5s...", err);
     evtSource.close();
-    setTimeout(() => subscribeToMessages(convKey, onMessageReceived), 5000);
+    setTimeout(() => subscribeToMessages(convKey), 5000);
   };
-
-  window.currentEventSource = evtSource;
 }
+
 
