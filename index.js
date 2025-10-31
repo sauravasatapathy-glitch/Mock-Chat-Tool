@@ -315,8 +315,7 @@ function renderMessage(container, msg) {
 
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey) {
-const evtSource = new EventSource(
-  `${API_BASE_URL}/messages?convKey=${convKey}`,
+const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);,
   { withCredentials: false }
 );
 
