@@ -295,28 +295,23 @@ function renderMessage(container, msg) {
   const currentRole = localStorage.getItem("role");
 
   const sender = msg.senderName || msg.sender_name || msg.sender || "Unknown";
-  const senderRole = msg.senderRole || msg.sender_role || "unknown";
+  const senderRole = msg.senderRole || msg.role || "unknown";
   const text = msg.text || "";
-  const isSelf =
-    sender.trim().toLowerCase() === currentUser?.name.trim().toLowerCase() &&
-    senderRole === currentRole;
+  const isSelf = sender === currentUser?.name && senderRole === currentRole;
 
-  const wrapper = document.createElement("div");
-  wrapper.className = `message ${isSelf ? "self" : "other"}`;
-  wrapper.innerHTML = `
-    <div>
-      <div><strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong></div>
-      <div>${text}</div>
-      <div style="font-size:0.7rem;opacity:0.7;margin-top:0.25rem;">
-        ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-      </div>
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `message ${isSelf ? "self" : "other"}`;
+  msgDiv.innerHTML = `
+    <strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong><br>
+    ${text}
+    <div style="font-size:0.7rem;opacity:0.7;margin-top:0.25rem;text-align:${isSelf ? "right" : "left"};">
+      ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
     </div>
   `;
-  container.appendChild(wrapper);
+
+  container.appendChild(msgDiv);
 }
+
 
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey, onMessageReceived) {
