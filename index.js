@@ -286,19 +286,18 @@ async function loadMessages(convKey) {
 
 // 🟦 Send message
 async function sendMessage(convKey, senderName, senderRole, text) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader },
-      body: JSON.stringify({ convKey, senderName, senderRole, text }),
-    });
+  const response = await fetch(`${API_BASE_URL}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader },
+    body: JSON.stringify({ convKey, senderName, senderRole, text }),
+  });
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Failed to send message");
-  } catch (err) {
-    console.error("Send message error:", err);
-  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to send message");
+
+  return data; // returns the inserted message object with id
 }
+
 
 // 🟦 Render a single message
 function renderMessage(container, msg) {
