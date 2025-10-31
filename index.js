@@ -315,27 +315,28 @@ function renderMessage(container, msg) {
 
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey) {
-const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
-);
+  const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
 
+  evtSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const container = document.getElementById("messages");
 
-evtSource.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  const container = document.getElementById("messages");
+      // Initial load (replace messages)
+      if (data.type === "init" && Array.isArray(data.messages)) {
+        container.innerHTML = "";
+        data.messages.forEach((msg) => renderMessage(container, msg));
+      }
 
-  // Initial load (optional)
-  if (data.type === "init" && Array.isArray(data.messages)) {
-    container.innerHTML = "";
-    data.messages.forEach((msg) => renderMessage(container, msg));
-  }
-
-  // New messages (stream updates)
-  if (data.type === "new" && Array.isArray(data.messages)) {
-    data.messages.forEach((msg) => renderMessage(container, msg));
-    container.scrollTop = container.scrollHeight;
-  }
-};
-
+      // New messages (append)
+      if (data.type === "new" && Array.isArray(data.messages)) {
+        data.messages.forEach((msg) => renderMessage(container, msg));
+        container.scrollTop = container.scrollHeight;
+      }
+    } catch (err) {
+      console.error("Error parsing SSE message:", err, event.data);
+    }
+  };
 
   evtSource.onerror = (err) => {
     console.warn("SSE disconnected. Retrying in 5s...", err);
@@ -343,5 +344,3 @@ evtSource.onmessage = (event) => {
     setTimeout(() => subscribeToMessages(convKey), 5000);
   };
 }
-
-
