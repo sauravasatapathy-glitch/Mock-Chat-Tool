@@ -315,17 +315,29 @@ function renderMessage(container, msg) {
 
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey) {
-  const evtSource = new EventSource(
-    `${API_BASE_URL}/stream?convKey=${convKey}`,
-    { withCredentials: true }
-  );
+const evtSource = new EventSource(
+  `${API_BASE_URL}/messages?convKey=${convKey}`,
+  { withCredentials: false }
+);
 
-  evtSource.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type === "new") {
-      for (const msg of data.messages) appendMessage(msg);
-    }
-  };
+
+evtSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  const container = document.getElementById("messages");
+
+  // Initial load (optional)
+  if (data.type === "init" && Array.isArray(data.messages)) {
+    container.innerHTML = "";
+    data.messages.forEach((msg) => renderMessage(container, msg));
+  }
+
+  // New messages (stream updates)
+  if (data.type === "new" && Array.isArray(data.messages)) {
+    data.messages.forEach((msg) => renderMessage(container, msg));
+    container.scrollTop = container.scrollHeight;
+  }
+};
+
 
   evtSource.onerror = (err) => {
     console.warn("SSE disconnected. Retrying in 5s...", err);
