@@ -17,6 +17,12 @@
       height: 100vh;
       color: #1e293b;
     }
+@keyframes bounceIn {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 /* Messages layout */
 #messages {
   display: flex;
@@ -210,5 +216,6 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
