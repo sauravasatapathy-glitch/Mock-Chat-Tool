@@ -291,45 +291,62 @@ async function sendMessage(convKey, senderName, senderRole, text) {
 
 // 🟦 Render a single message
 function renderMessage(container, msg) {
-  const isSelf = msg.role === role;
+  const currentUser = JSON.parse(localStorage.getItem("user"));
+  const currentRole = localStorage.getItem("role");
+
+  // Compatibility with both message schemas
+  const sender = msg.senderName || msg.sender_name || msg.sender || "Unknown";
+  const senderRole = msg.senderRole || msg.role || "unknown";
+  const text = msg.text || "";
+  const isSelf = sender === currentUser?.name && senderRole === currentRole;
+
   const msgDiv = document.createElement("div");
-  msgDiv.classList.add("message");
-  msgDiv.style.alignSelf = isSelf ? "flex-end" : "flex-start";
-  msgDiv.style.background = isSelf ? "#2563eb" : "#e2e8f0";
-  msgDiv.style.color = isSelf ? "#fff" : "#1e293b";
-  msgDiv.style.padding = "0.6rem 0.9rem";
-  msgDiv.style.borderRadius = "16px";
-  msgDiv.style.maxWidth = "70%";
-  msgDiv.style.wordWrap = "break-word";
-  msgDiv.style.lineHeight = "1.4";
-  msgDiv.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)";
-  msgDiv.style.animation = "bounceIn 0.25s ease-out";
-  msgDiv.innerHTML = `<strong>${msg.sender_name || msg.sender}</strong><br>${msg.text}`;
+  msgDiv.style.display = "flex";
+  msgDiv.style.justifyContent = isSelf ? "flex-end" : "flex-start";
+
+  msgDiv.innerHTML = `
+    <div style="
+      background:${isSelf ? '#2563eb' : '#e2e8f0'};
+      color:${isSelf ? 'white' : '#1e293b'};
+      padding:0.6rem 0.9rem;
+      border-radius:0.75rem;
+      max-width:70%;
+      font-size:0.95rem;
+      word-wrap:break-word;
+      box-shadow:0 1px 2px rgba(0,0,0,0.08);
+    ">
+      <strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong><br>
+      ${text}
+      <div style="font-size:0.7rem;text-align:${isSelf ? 'right' : 'left'};opacity:0.7;margin-top:0.25rem;">
+        ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+  `;
 
   container.appendChild(msgDiv);
-  // Smooth scroll into view
-  msgDiv.scrollIntoView({ behavior: "smooth", block: "end" });
 }
-
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey, onMessageReceived) {
   if (window.currentEventSource) window.currentEventSource.close();
 
-  const evtSource = new EventSource(`${API_BASE_URL}/stream?convKey=${convKey}`, {
-    withCredentials: true,
-  });
+  const evtSource = new EventSource(`${API_BASE_URL}/stream?convKey=${convKey}`);
 
   evtSource.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg && msg.text) {
-      onMessageReceived(msg);
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg && msg.text) onMessageReceived(msg);
+    } catch (err) {
+      console.error("SSE parse error:", err);
     }
   };
 
   evtSource.onerror = (err) => {
-    console.error("SSE error:", err);
-    evtSource.close();
+    console.warn("SSE error:", err);
+    // Retry after 5s if disconnected
+    setTimeout(() => subscribeToMessages(convKey, onMessageReceived), 5000);
   };
 
   window.currentEventSource = evtSource;
+}
+
 }
