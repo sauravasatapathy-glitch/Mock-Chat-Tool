@@ -208,42 +208,33 @@ async function openConversation(conv) {
   });
 
   // === Helper: send + render message ===
-  async function handleSend() {
-    const text = input.value.trim();
-    if (!text) return;
+async function handleSend() {
+  const text = input.value.trim();
+  if (!text) return;
 
+  try {
+    // ✅ Send once to backend and get the inserted row
+    const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
 
-// 1️⃣ Send to backend first (fast request, returns id)
-let newMsg;
-try {
-  newMsg = await sendMessage(conv.conv_key, user.name, role, text);
-} catch (err) {
-  console.error("Send failed:", err);
-  return;
+    // ✅ Instantly render it locally (only once)
+    renderMessage(container, {
+      id: newMsg.id,
+      senderName: newMsg.sender_name,
+      senderRole: newMsg.role, // matches backend
+      text: newMsg.text,
+      timestamp: newMsg.timestamp,
+    });
+
+    container.scrollTop = container.scrollHeight;
+
+    // ✅ Clear input
+    input.value = "";
+    input.style.height = "44px";
+  } catch (err) {
+    console.error("Send failed:", err);
+  }
 }
 
-// 2️⃣ Render immediately using backend-confirmed data
-renderMessage(container, {
-  id: newMsg.id,
-  senderName: newMsg.sender_name,
-  senderRole: newMsg.sender_role,
-  text: newMsg.text,
-  timestamp: newMsg.timestamp,
-});
-container.scrollTop = container.scrollHeight;
-
-// 3️⃣ Clear input instantly
-input.value = "";
-input.style.height = "44px";
-
-
-    // 3️⃣ Send to backend
-    try {
-      await sendMessage(conv.conv_key, user.name, role, text);
-    } catch (err) {
-      console.error("Send failed:", err);
-    }
-  }
 
   // === Send button click ===
   sendBtn.addEventListener("click", handleSend);
