@@ -328,16 +328,17 @@ function subscribeToMessages(convKey) {
       if (!container) return;
 
       // Helper: render only unseen messages
-      const renderUnseen = (msgs) => {
-        msgs.forEach((msg) => {
-          const uniqueKey = `${msg.senderName || msg.sender_name}-${msg.text}-${msg.timestamp}`;
-          if (!seenMessages.has(uniqueKey)) {
-            seenMessages.add(uniqueKey);
-            renderMessage(container, msg);
-          }
-        });
-        container.scrollTop = container.scrollHeight;
-      };
+const renderUnseen = (msgs) => {
+  msgs.forEach((msg) => {
+    const uniqueKey = msg.id; // 👈 now reliable
+    if (!seenMessages.has(uniqueKey)) {
+      seenMessages.add(uniqueKey);
+      renderMessage(container, msg);
+    }
+  });
+  container.scrollTop = container.scrollHeight;
+};
+
 
       if (data.type === "init" && Array.isArray(data.messages)) {
         container.innerHTML = "";
