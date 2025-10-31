@@ -112,6 +112,39 @@
       background: #cbd5e1;
       border-radius: 3px;
     }
+    /* Chat messages layout fix */
+#messages {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 400px;
+  background: #fff;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.message {
+  margin-bottom: 0.5rem;
+  max-width: 70%;
+  padding: 0.6rem 0.8rem;
+  border-radius: 1rem;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+
+.message.self {
+  align-self: flex-end;
+  background: #2563eb;
+  color: #fff;
+}
+
+.message.other {
+  align-self: flex-start;
+  background: #e2e8f0;
+  color: #1e293b;
+}
   </style>
 </head>
 
@@ -140,3 +173,4 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
