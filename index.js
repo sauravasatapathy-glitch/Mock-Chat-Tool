@@ -117,111 +117,138 @@ async function createConversation(trainerName, associateName) {
 // 🟦 Open a specific conversation
 async function openConversation(conv) {
   chatContent.innerHTML = `
-    <div id="chatHeader" style="
+    <div id="chatContainer" style="
       display:flex;
       flex-direction:column;
-      align-items:center;
-      gap:0.3rem;
-      padding:0.5rem 0;
-    ">
-      <h3 style="background:#2563eb;color:white;padding:0.4rem 1rem;border-radius:0.5rem;">
-        ${conv.trainer_name} ↔ ${conv.associate_name}
-      </h3>
-      <p style="font-weight:600;">Conversation Key: <span style="color:#2563eb;">${conv.conv_key}</span></p>
-    </div>
-
-    <div id="messages" data-conv-key="${conv.conv_key}" style="
-      display:flex;
-      flex-direction:column;
-      gap:0.4rem;
-      align-items:flex-start;
-      justify-content:flex-end;
-      overflow-y:auto;
-      margin-top:1rem;
-      padding:1rem;
-      border:1px solid #e2e8f0;
+      height:80vh;
+      width:100%;
+      background:#f9fafb;
       border-radius:10px;
-      background:#fff;
-      height:60vh;
-      width:100%;
-      box-shadow:0 1px 2px rgba(0,0,0,0.05);
-      scroll-behavior:smooth;
-    "></div>
-
-    <div id="chatInputArea" style="
-      display:flex;
-      align-items:center;
-      margin-top:1rem;
-      width:100%;
-      gap:0.5rem;
+      border:1px solid #e2e8f0;
+      box-shadow:0 1px 3px rgba(0,0,0,0.05);
+      overflow:hidden;
     ">
-      <textarea id="chatInput" placeholder="Type a message..."
-        style="
+      <div id="chatHeader" style="
+        flex-shrink:0;
+        background:#2563eb;
+        color:white;
+        padding:0.75rem 1rem;
+        font-weight:600;
+        text-align:center;
+      ">
+        ${conv.trainer_name} ↔ ${conv.associate_name}
+        <div style="font-size:0.8rem;opacity:0.9;">Conversation Key: ${conv.conv_key}</div>
+      </div>
+
+      <div id="messages" data-conv-key="${conv.conv_key}" style="
+        flex:1;
+        overflow-y:auto;
+        padding:1rem;
+        display:flex;
+        flex-direction:column;
+        gap:0.4rem;
+        background:white;
+        scroll-behavior:smooth;
+      "></div>
+
+      <div id="chatInputArea" style="
+        flex-shrink:0;
+        display:flex;
+        align-items:flex-end;
+        padding:0.5rem;
+        border-top:1px solid #e5e7eb;
+        background:#f8fafc;
+        gap:0.5rem;
+      ">
+        <textarea id="chatInput" placeholder="Type a message..." style="
           flex:1;
           border:1px solid #cbd5e1;
           border-radius:0.5rem;
           padding:0.6rem 0.75rem;
           font-size:0.95rem;
           outline:none;
-          height:44px;
-          min-height:44px;
           resize:none;
+          height:44px;
           font-family:inherit;
+          max-height:120px;
         "></textarea>
-      <button id="sendBtn"
-        style="
+        <button id="sendBtn" style="
           background:#2563eb;
           color:white;
           border:none;
           border-radius:0.5rem;
-          padding:0.6rem 1.5rem;
+          padding:0.6rem 1.2rem;
           font-size:0.95rem;
           cursor:pointer;
           height:44px;
           flex-shrink:0;
           transition:background 0.2s, transform 0.1s;
         "
-        onmouseover="this.style.background='#1e40af'"
-        onmouseout="this.style.background='#2563eb'"
-        onmousedown="this.style.transform='scale(0.96)'"
-        onmouseup="this.style.transform='scale(1)'"
-      >Send</button>
+          onmouseover="this.style.background='#1e40af'"
+          onmouseout="this.style.background='#2563eb'"
+          onmousedown="this.style.transform='scale(0.96)'"
+          onmouseup="this.style.transform='scale(1)'"
+        >Send</button>
+      </div>
     </div>
   `;
 
-  await loadMessages(conv.conv_key);
-  subscribeToMessages(conv.conv_key); // 🔌 Live updates
-
+  const container = document.getElementById("messages");
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendBtn");
 
-  // === Click Send ===
-  sendBtn.addEventListener("click", async () => {
+  // === Load initial messages ===
+  await loadMessages(conv.conv_key);
+  container.scrollTop = container.scrollHeight;
+
+  // === Subscribe to SSE (live updates) ===
+  subscribeToMessages(conv.conv_key, (msg) => {
+    renderMessage(container, msg);
+    container.scrollTop = container.scrollHeight;
+  });
+
+  // === Helper: send + render message ===
+  async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
 
-    await sendMessage(conv.conv_key, user.name, role, text);
+    // 1️⃣ Render immediately (optimistic)
+    const tempMsg = {
+      senderName: user.name,
+      senderRole: role,
+      text,
+      timestamp: new Date().toISOString(),
+    };
+    renderMessage(container, tempMsg);
+    container.scrollTop = container.scrollHeight;
+
+    // 2️⃣ Clear input instantly
     input.value = "";
-    input.style.height = "44px"; // reset height
-  });
+    input.style.height = "44px";
+
+    // 3️⃣ Send to backend
+    try {
+      await sendMessage(conv.conv_key, user.name, role, text);
+    } catch (err) {
+      console.error("Send failed:", err);
+    }
+  }
+
+  // === Send button click ===
+  sendBtn.addEventListener("click", handleSend);
 
   // === Enter to send, Shift+Enter for newline ===
   input.addEventListener("keydown", async (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const text = input.value.trim();
-      if (!text) return;
-
-      await sendMessage(conv.conv_key, user.name, role, text);
-      input.value = "";
-      input.style.height = "44px";
+      await handleSend();
     } else {
-      // Auto expand textarea as user types
       input.style.height = "auto";
-      input.style.height = Math.min(input.scrollHeight, 120) + "px"; // limit to 120px
+      input.style.height = Math.min(input.scrollHeight, 120) + "px";
     }
   });
 }
+
 
 
 
@@ -285,26 +312,24 @@ function renderMessage(container, msg) {
 }
 
 // 🟦 Subscribe to live updates (SSE)
-function subscribeToMessages(convKey) {
-  if (window.eventSource) {
-    window.eventSource.close();
-  }
+function subscribeToMessages(convKey, onMessageReceived) {
+  if (window.currentEventSource) window.currentEventSource.close();
 
-  const url = `${API_BASE_URL}/stream?convKey=${convKey}`;
-  const eventSource = new EventSource(url);
-  window.eventSource = eventSource;
+  const evtSource = new EventSource(`${API_BASE_URL}/stream?convKey=${convKey}`, {
+    withCredentials: true,
+  });
 
-  eventSource.onmessage = (event) => {
+  evtSource.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    const messagesBox = document.getElementById("messages");
-    if (!messagesBox) return;
-
-    renderMessage(messagesBox, msg);
-    messagesBox.scrollTop = messagesBox.scrollHeight;
+    if (msg && msg.text) {
+      onMessageReceived(msg);
+    }
   };
 
-  eventSource.onerror = () => {
-    console.warn("🔌 SSE disconnected. Retrying in 5s...");
-    setTimeout(() => subscribeToMessages(convKey), 5000);
+  evtSource.onerror = (err) => {
+    console.error("SSE error:", err);
+    evtSource.close();
   };
+
+  window.currentEventSource = evtSource;
 }
