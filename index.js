@@ -171,6 +171,7 @@ async function loadMessages(convKey) {
   }
 }
 
+
 // 🟦 Send message
 async function sendMessage(convKey, senderName, senderRole, text) {
   try {
@@ -190,18 +191,14 @@ async function sendMessage(convKey, senderName, senderRole, text) {
 // 🟦 Render a single message
 function renderMessage(container, msg) {
   const msgDiv = document.createElement("div");
-  msgDiv.style.margin = "0.5rem 0";
-  msgDiv.style.textAlign = msg.role === role ? "right" : "left";
+  msgDiv.className = `message ${msg.role === role ? "self" : "other"}`;
   msgDiv.innerHTML = `
-    <div style="display:inline-block;background:${
-      msg.role === role ? "#2563eb" : "#e2e8f0"
-    };color:${msg.role === role ? "white" : "#1e293b"};
-    padding:0.5rem 0.75rem;border-radius:0.75rem;max-width:70%;">
-      <strong>${msg.sender_name || msg.sender}</strong><br>${msg.text}
-    </div>
+    <strong>${msg.sender_name || msg.sender}</strong><br>
+    ${msg.text}
   `;
   container.appendChild(msgDiv);
 }
+
 
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey) {
