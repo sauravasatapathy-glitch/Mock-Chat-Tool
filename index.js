@@ -117,31 +117,68 @@ async function createConversation(trainerName, associateName) {
 // 🟦 Open a specific conversation
 async function openConversation(conv) {
   chatContent.innerHTML = `
-    <h3>${conv.trainer_name} ↔ ${conv.associate_name}</h3>
-    <p><b>Conversation Key:</b> ${conv.conv_key}</p>
-    <div id="messages" data-conv-key="${conv.conv_key}"
-         style="flex:1;overflow-y:auto;margin-top:1rem;
-         padding:0.5rem;border:1px solid #ddd;
-         border-radius:0.5rem;background:#fff;height:300px;"></div>
+    <div id="chatHeader" style="
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:0.3rem;
+      padding:0.5rem 0;
+    ">
+      <h3 style="background:#2563eb;color:white;padding:0.4rem 1rem;border-radius:0.5rem;">
+        ${conv.trainer_name} ↔ ${conv.associate_name}
+      </h3>
+      <p style="font-weight:600;">Conversation Key: <span style="color:#2563eb;">${conv.conv_key}</span></p>
+    </div>
 
-    <div style="display:flex;margin-top:1rem;">
+    <div id="messages" data-conv-key="${conv.conv_key}" style="
+      display:flex;
+      flex-direction:column;
+      gap:0.4rem;
+      align-items:flex-start;
+      justify-content:flex-end;
+      overflow-y:auto;
+      margin-top:1rem;
+      padding:1rem;
+      border:1px solid #e2e8f0;
+      border-radius:10px;
+      background:#fff;
+      height:60vh;
+      width:100%;
+      box-shadow:0 1px 2px rgba(0,0,0,0.05);
+    "></div>
+
+    <div id="chatInputArea" style="
+      display:flex;
+      align-items:center;
+      margin-top:1rem;
+      gap:0.5rem;
+    ">
       <input id="chatInput" placeholder="Type a message..."
-             style="flex:1;padding:0.6rem;border:1px solid #ccc;
-             border-radius:0.5rem 0 0 0.5rem;" />
+        style="
+          flex:1;
+          border:1px solid #cbd5e1;
+          border-radius:0.5rem;
+          padding:0.6rem 0.75rem;
+          font-size:0.95rem;
+          outline:none;
+        "/>
       <button id="sendBtn"
-              style="padding:0.6rem 1rem;background:#2563eb;
-              color:white;border:none;border-radius:0 0.5rem 0.5rem 0;
-              cursor:pointer;">
-        Send
-      </button>
+        style="
+          background:#2563eb;
+          color:white;
+          border:none;
+          border-radius:0.5rem;
+          padding:0.6rem 1rem;
+          cursor:pointer;
+        ">Send</button>
     </div>
   `;
 
   await loadMessages(conv.conv_key);
-  subscribeToMessages(conv.conv_key); // 🔌 Live updates
+  subscribeToMessages(conv.conv_key); // 🔌 Real-time updates
 
-  // === Send button handler ===
-  document.getElementById("sendBtn").addEventListener("click", async () => {
+  const sendBtn = document.getElementById("sendBtn");
+  sendBtn.addEventListener("click", async () => {
     const input = document.getElementById("chatInput");
     const text = input.value.trim();
     if (!text) return;
@@ -190,16 +227,24 @@ async function sendMessage(convKey, senderName, senderRole, text) {
 
 // 🟦 Render a single message
 function renderMessage(container, msg) {
+  const isSelf = msg.role === role; // current user
   const msgDiv = document.createElement("div");
-  msgDiv.className = `message ${msg.role === role ? "self" : "other"}`;
+  msgDiv.classList.add("message");
+  msgDiv.style.alignSelf = isSelf ? "flex-end" : "flex-start";
+  msgDiv.style.background = isSelf ? "#2563eb" : "#e2e8f0";
+  msgDiv.style.color = isSelf ? "#fff" : "#1e293b";
+  msgDiv.style.padding = "0.6rem 0.9rem";
+  msgDiv.style.borderRadius = "16px";
+  msgDiv.style.maxWidth = "70%";
+  msgDiv.style.wordWrap = "break-word";
+  msgDiv.style.lineHeight = "1.4";
+  msgDiv.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)";
   msgDiv.innerHTML = `
-    <strong>${msg.sender_name || msg.sender}</strong><br>
-    ${msg.text}
+    <strong>${msg.sender_name || msg.sender}</strong><br>${msg.text}
   `;
   container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight; // auto-scroll
 }
-
-
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey) {
   if (window.eventSource) {
