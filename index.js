@@ -348,5 +348,3 @@ function subscribeToMessages(convKey, onMessageReceived) {
 
   window.currentEventSource = evtSource;
 }
-
-}
