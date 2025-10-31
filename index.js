@@ -212,19 +212,30 @@ async function openConversation(conv) {
     const text = input.value.trim();
     if (!text) return;
 
-    // 1️⃣ Render immediately (optimistic)
-    const tempMsg = {
-      senderName: user.name,
-      senderRole: role,
-      text,
-      timestamp: new Date().toISOString(),
-    };
-    renderMessage(container, tempMsg);
-    container.scrollTop = container.scrollHeight;
 
-    // 2️⃣ Clear input instantly
-    input.value = "";
-    input.style.height = "44px";
+// 1️⃣ Send to backend first (fast request, returns id)
+let newMsg;
+try {
+  newMsg = await sendMessage(conv.conv_key, user.name, role, text);
+} catch (err) {
+  console.error("Send failed:", err);
+  return;
+}
+
+// 2️⃣ Render immediately using backend-confirmed data
+renderMessage(container, {
+  id: newMsg.id,
+  senderName: newMsg.sender_name,
+  senderRole: newMsg.sender_role,
+  text: newMsg.text,
+  timestamp: newMsg.timestamp,
+});
+container.scrollTop = container.scrollHeight;
+
+// 3️⃣ Clear input instantly
+input.value = "";
+input.style.height = "44px";
+
 
     // 3️⃣ Send to backend
     try {
