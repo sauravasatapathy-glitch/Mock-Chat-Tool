@@ -294,57 +294,57 @@ function renderMessage(container, msg) {
   const currentUser = JSON.parse(localStorage.getItem("user"));
   const currentRole = localStorage.getItem("role");
 
-  // Compatibility with both message schemas
   const sender = msg.senderName || msg.sender_name || msg.sender || "Unknown";
-  const senderRole = msg.senderRole || msg.role || "unknown";
+  const senderRole = msg.senderRole || msg.sender_role || "unknown";
   const text = msg.text || "";
-  const isSelf = sender === currentUser?.name && senderRole === currentRole;
+  const isSelf =
+    sender.trim().toLowerCase() === currentUser?.name.trim().toLowerCase() &&
+    senderRole === currentRole;
 
-  const msgDiv = document.createElement("div");
-  msgDiv.style.display = "flex";
-  msgDiv.style.justifyContent = isSelf ? "flex-end" : "flex-start";
-
-  msgDiv.innerHTML = `
-    <div style="
-      background:${isSelf ? '#2563eb' : '#e2e8f0'};
-      color:${isSelf ? 'white' : '#1e293b'};
-      padding:0.6rem 0.9rem;
-      border-radius:0.75rem;
-      max-width:70%;
-      font-size:0.95rem;
-      word-wrap:break-word;
-      box-shadow:0 1px 2px rgba(0,0,0,0.08);
-    ">
-      <strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong><br>
-      ${text}
-      <div style="font-size:0.7rem;text-align:${isSelf ? 'right' : 'left'};opacity:0.7;margin-top:0.25rem;">
-        ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+  const wrapper = document.createElement("div");
+  wrapper.className = `message ${isSelf ? "self" : "other"}`;
+  wrapper.innerHTML = `
+    <div>
+      <div><strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong></div>
+      <div>${text}</div>
+      <div style="font-size:0.7rem;opacity:0.7;margin-top:0.25rem;">
+        ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
       </div>
     </div>
   `;
-
-  container.appendChild(msgDiv);
+  container.appendChild(wrapper);
 }
+
 // 🟦 Subscribe to live updates (SSE)
 function subscribeToMessages(convKey, onMessageReceived) {
   if (window.currentEventSource) window.currentEventSource.close();
 
-  const evtSource = new EventSource(`${API_BASE_URL}/stream?convKey=${convKey}`);
+  const evtSource = new EventSource(`${API_BASE_URL}/stream?convKey=${convKey}`, {
+    withCredentials: true,
+  });
 
   evtSource.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
-      if (msg && msg.text) onMessageReceived(msg);
+      if (msg?.text) onMessageReceived(msg);
     } catch (err) {
       console.error("SSE parse error:", err);
     }
   };
 
+  evtSource.addEventListener("ping", () => {
+    // Keep alive ping from server
+  });
+
   evtSource.onerror = (err) => {
-    console.warn("SSE error:", err);
-    // Retry after 5s if disconnected
+    console.warn("SSE disconnected. Retrying in 5s...", err);
+    evtSource.close();
     setTimeout(() => subscribeToMessages(convKey, onMessageReceived), 5000);
   };
 
   window.currentEventSource = evtSource;
 }
+
