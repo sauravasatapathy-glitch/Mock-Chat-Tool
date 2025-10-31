@@ -27,40 +27,31 @@
 #messages {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  padding: 1rem;
-  overflow-y: auto;
-  max-height: 400px;
-  background: #fff;
-  border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
+  gap: 0.5rem;
 }
 
-/* Each message bubble */
 .message {
-  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
   max-width: 70%;
   padding: 0.6rem 0.9rem;
   border-radius: 1rem;
-  word-wrap: break-word;
   line-height: 1.4;
-  font-size: 0.95rem;
+  word-wrap: break-word;
 }
 
-/* Sent by current user */
 .message.self {
-  background-color: #007bff;
-  color: white;
   align-self: flex-end;
-  text-align: right;
+  background-color: #2563eb;
+  color: white;
+  border-bottom-right-radius: 0.3rem;
 }
 
-/* Received */
 .message.other {
+  align-self: flex-start;
   background-color: #e5e5ea;
   color: black;
-  align-self: flex-start;
-  text-align: left;
+  border-bottom-left-radius: 0.3rem;
 }
 
     /* === Panes === */
@@ -218,6 +209,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
