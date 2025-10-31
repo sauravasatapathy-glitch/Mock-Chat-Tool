@@ -317,21 +317,36 @@ function renderMessage(container, msg) {
 function subscribeToMessages(convKey) {
   const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
 
+  // 🧠 Track displayed message timestamps (or unique combo)
+  const seenMessages = new Set();
+
   evtSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
       const container = document.getElementById("messages");
 
-      // Initial load (replace messages)
+      if (!container) return;
+
+      // Helper: render only unseen messages
+      const renderUnseen = (msgs) => {
+        msgs.forEach((msg) => {
+          const uniqueKey = `${msg.senderName || msg.sender_name}-${msg.text}-${msg.timestamp}`;
+          if (!seenMessages.has(uniqueKey)) {
+            seenMessages.add(uniqueKey);
+            renderMessage(container, msg);
+          }
+        });
+        container.scrollTop = container.scrollHeight;
+      };
+
       if (data.type === "init" && Array.isArray(data.messages)) {
         container.innerHTML = "";
-        data.messages.forEach((msg) => renderMessage(container, msg));
+        seenMessages.clear();
+        renderUnseen(data.messages);
       }
 
-      // New messages (append)
       if (data.type === "new" && Array.isArray(data.messages)) {
-        data.messages.forEach((msg) => renderMessage(container, msg));
-        container.scrollTop = container.scrollHeight;
+        renderUnseen(data.messages);
       }
     } catch (err) {
       console.error("Error parsing SSE message:", err, event.data);
@@ -344,3 +359,4 @@ function subscribeToMessages(convKey) {
     setTimeout(() => subscribeToMessages(convKey), 5000);
   };
 }
+
