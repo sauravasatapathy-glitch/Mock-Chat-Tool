@@ -1,11 +1,11 @@
 // ============================
-// index.js (Clean Version)
+// index.js (Updated - Duplicate Fix)
 // ============================
 
 import { getUserFromToken, getAuthHeader } from "./authHelper.js";
 import { checkAuth, logout } from "./authGuard.js";
 
-const API_BASE_URL = "https://mock-chat-backend.vercel.app/api"; // ✅ backend URL
+const API_BASE_URL = "https://mock-chat-backend.vercel.app/api";
 
 // === DOM Elements ===
 const leftPane = document.getElementById("left-pane");
@@ -23,6 +23,9 @@ if (!session) {
 const { user, token, role } = session;
 const authHeader = getAuthHeader();
 
+// ✅ GLOBAL cache to prevent duplicate rendering
+const messageSeenRegistry = {}; // { convKey: Set(ids) }
+
 // === Role-based layout ===
 if (role === "agent") {
   rightPane.style.display = "none";
@@ -37,17 +40,16 @@ if (role === "agent") {
 const logoutBtn = document.createElement("button");
 logoutBtn.textContent = "Logout";
 logoutBtn.style.cssText = `
-  position:fixed;top:10px;right:10px;
-  padding:0.4rem 0.8rem;background:#dc2626;
-  color:white;border:none;border-radius:0.5rem;
-  cursor:pointer;z-index:1000;
+  position:fixed; top:10px; right:10px;
+  padding:0.4rem 0.8rem; background:#dc2626;
+  color:white; border:none; border-radius:0.5rem;
+  cursor:pointer; z-index:1000;
 `;
 logoutBtn.onclick = logout;
 document.body.appendChild(logoutBtn);
 
 // === Load conversations on startup ===
 loadConversations();
-
 
 // ========================================================
 // === FUNCTIONS ==========================================
@@ -118,71 +120,36 @@ async function createConversation(trainerName, associateName) {
 async function openConversation(conv) {
   chatContent.innerHTML = `
     <div id="chatContainer" style="
-      display:flex;
-      flex-direction:column;
-      height:80vh;
-      width:100%;
-      background:#f9fafb;
-      border-radius:10px;
-      border:1px solid #e2e8f0;
-      box-shadow:0 1px 3px rgba(0,0,0,0.05);
-      overflow:hidden;
+      display:flex; flex-direction:column; height:80vh; width:100%;
+      background:#f9fafb; border-radius:10px; border:1px solid #e2e8f0;
+      box-shadow:0 1px 3px rgba(0,0,0,0.05); overflow:hidden;
     ">
       <div id="chatHeader" style="
-        flex-shrink:0;
-        background:#2563eb;
-        color:white;
-        padding:0.75rem 1rem;
-        font-weight:600;
-        text-align:center;
+        flex-shrink:0; background:#2563eb; color:white; padding:0.75rem 1rem;
+        font-weight:600; text-align:center;
       ">
         ${conv.trainer_name} ↔ ${conv.associate_name}
-        <div style="font-size:0.8rem;opacity:0.9;">Conversation Key: ${conv.conv_key}</div>
+        <div style="font-size:0.8rem; opacity:0.9;">Conversation Key: ${conv.conv_key}</div>
       </div>
 
       <div id="messages" data-conv-key="${conv.conv_key}" style="
-        flex:1;
-        overflow-y:auto;
-        padding:1rem;
-        display:flex;
-        flex-direction:column;
-        gap:0.4rem;
-        background:white;
-        scroll-behavior:smooth;
+        flex:1; overflow-y:auto; padding:1rem; display:flex;
+        flex-direction:column; gap:0.4rem; background:white; scroll-behavior:smooth;
       "></div>
 
       <div id="chatInputArea" style="
-        flex-shrink:0;
-        display:flex;
-        align-items:flex-end;
-        padding:0.5rem;
-        border-top:1px solid #e5e7eb;
-        background:#f8fafc;
-        gap:0.5rem;
+        flex-shrink:0; display:flex; align-items:flex-end; padding:0.5rem;
+        border-top:1px solid #e5e7eb; background:#f8fafc; gap:0.5rem;
       ">
         <textarea id="chatInput" placeholder="Type a message..." style="
-          flex:1;
-          border:1px solid #cbd5e1;
-          border-radius:0.5rem;
-          padding:0.6rem 0.75rem;
-          font-size:0.95rem;
-          outline:none;
-          resize:none;
-          height:44px;
-          font-family:inherit;
-          max-height:120px;
+          flex:1; border:1px solid #cbd5e1; border-radius:0.5rem;
+          padding:0.6rem 0.75rem; font-size:0.95rem; outline:none;
+          resize:none; height:44px; font-family:inherit; max-height:120px;
         "></textarea>
         <button id="sendBtn" style="
-          background:#2563eb;
-          color:white;
-          border:none;
-          border-radius:0.5rem;
-          padding:0.6rem 1.2rem;
-          font-size:0.95rem;
-          cursor:pointer;
-          height:44px;
-          flex-shrink:0;
-          transition:background 0.2s, transform 0.1s;
+          background:#2563eb; color:white; border:none; border-radius:0.5rem;
+          padding:0.6rem 1.2rem; font-size:0.95rem; cursor:pointer; height:44px;
+          flex-shrink:0; transition:background 0.2s, transform 0.1s;
         "
           onmouseover="this.style.background='#1e40af'"
           onmouseout="this.style.background='#2563eb'"
@@ -197,49 +164,47 @@ async function openConversation(conv) {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendBtn");
 
+  // ✅ Create registry for this specific conversation if not exists
+  if (!messageSeenRegistry[conv.conv_key]) {
+    messageSeenRegistry[conv.conv_key] = new Set();
+  }
+
   // === Load initial messages ===
   await loadMessages(conv.conv_key);
   container.scrollTop = container.scrollHeight;
 
-  // === Subscribe to SSE (live updates) ===
-  subscribeToMessages(conv.conv_key, (msg) => {
-    renderMessage(container, msg);
-    container.scrollTop = container.scrollHeight;
-  });
+  // === Subscribe to SSE live updates ===
+  subscribeToMessages(conv.conv_key, container);
 
-  // === Helper: send + render message ===
-async function handleSend() {
-  const text = input.value.trim();
-  if (!text) return;
+  // === Handle sending message ===
+  async function handleSend() {
+    const text = input.value.trim();
+    if (!text) return;
 
-  try {
-    // ✅ Send once to backend and get the inserted row
-    const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
+    try {
+      const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
 
-    // ✅ Instantly render it locally (only once)
-    renderMessage(container, {
-      id: newMsg.id,
-      senderName: newMsg.sender_name,
-      senderRole: newMsg.role, // matches backend
-      text: newMsg.text,
-      timestamp: newMsg.timestamp,
-    });
+      // ✅ Mark seen immediately so SSE doesn't re-render it
+      messageSeenRegistry[conv.conv_key].add(newMsg.id);
 
-    container.scrollTop = container.scrollHeight;
+      renderMessage(container, {
+        id: newMsg.id,
+        senderName: newMsg.sender_name,
+        senderRole: newMsg.role,
+        text: newMsg.text,
+        timestamp: newMsg.timestamp,
+      });
 
-    // ✅ Clear input
-    input.value = "";
-    input.style.height = "44px";
-  } catch (err) {
-    console.error("Send failed:", err);
+      container.scrollTop = container.scrollHeight;
+      input.value = "";
+      input.style.height = "44px";
+    } catch (err) {
+      console.error("Send failed:", err);
+    }
   }
-}
 
-
-  // === Send button click ===
   sendBtn.addEventListener("click", handleSend);
 
-  // === Enter to send, Shift+Enter for newline ===
   input.addEventListener("keydown", async (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -250,9 +215,6 @@ async function handleSend() {
     }
   });
 }
-
-
-
 
 // 🟦 Load messages
 async function loadMessages(convKey) {
@@ -267,13 +229,19 @@ async function loadMessages(convKey) {
     const container = document.getElementById("messages");
     container.innerHTML = "";
 
-    messages.forEach((msg) => renderMessage(container, msg));
+    const seen = messageSeenRegistry[convKey] || new Set();
+
+    messages.forEach((msg) => {
+      seen.add(msg.id); // ✅ preload all IDs so SSE doesn't re-display them
+      renderMessage(container, msg);
+    });
+
+    messageSeenRegistry[convKey] = seen;
     container.scrollTop = container.scrollHeight;
   } catch (err) {
     console.error("Error loading messages:", err);
   }
 }
-
 
 // 🟦 Send message
 async function sendMessage(convKey, senderName, senderRole, text) {
@@ -286,79 +254,58 @@ async function sendMessage(convKey, senderName, senderRole, text) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Failed to send message");
 
-  return data; // returns the inserted message object with id
+  return data;
 }
-
 
 // 🟦 Render a single message
 function renderMessage(container, msg) {
   const currentUser = JSON.parse(localStorage.getItem("user"));
   const currentRole = localStorage.getItem("role");
 
-  const sender = msg.senderName || msg.sender_name || msg.sender || "Unknown";
-  const senderRole = msg.senderRole || msg.role || "unknown";
-  const text = msg.text || "";
+  const sender = msg.senderName || msg.sender_name;
+  const senderRole = msg.senderRole || msg.role;
   const isSelf = sender === currentUser?.name && senderRole === currentRole;
 
   const msgDiv = document.createElement("div");
   msgDiv.className = `message ${isSelf ? "self" : "other"}`;
+
   msgDiv.innerHTML = `
     <strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong><br>
-    ${text}
+    ${msg.text}
     <div style="font-size:0.7rem;opacity:0.7;margin-top:0.25rem;text-align:${isSelf ? "right" : "left"};">
-      ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      ${new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
     </div>
   `;
 
   container.appendChild(msgDiv);
 }
 
-
 // 🟦 Subscribe to live updates (SSE)
-function subscribeToMessages(convKey) {
+function subscribeToMessages(convKey, container) {
   const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
-
-  // 🧠 Track displayed message timestamps (or unique combo)
-  const seenMessages = new Set();
 
   evtSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      const container = document.getElementById("messages");
+      const seen = messageSeenRegistry[convKey];
 
-      if (!container) return;
-
-      // Helper: render only unseen messages
-const renderUnseen = (msgs) => {
-  msgs.forEach((msg) => {
-    const uniqueKey = msg.id; // 👈 now reliable
-    if (!seenMessages.has(uniqueKey)) {
-      seenMessages.add(uniqueKey);
-      renderMessage(container, msg);
-    }
-  });
-  container.scrollTop = container.scrollHeight;
-};
-
-
-      if (data.type === "init" && Array.isArray(data.messages)) {
-        container.innerHTML = "";
-        seenMessages.clear();
-        renderUnseen(data.messages);
+      if (data.type === "new") {
+        data.messages.forEach((msg) => {
+          if (!seen.has(msg.id)) {
+            seen.add(msg.id);
+            renderMessage(container, msg);
+          }
+        });
       }
-
-      if (data.type === "new" && Array.isArray(data.messages)) {
-        renderUnseen(data.messages);
-      }
+      container.scrollTop = container.scrollHeight;
     } catch (err) {
-      console.error("Error parsing SSE message:", err, event.data);
+      console.error("Error parsing SSE message:", err);
     }
   };
 
   evtSource.onerror = (err) => {
     console.warn("SSE disconnected. Retrying in 5s...", err);
     evtSource.close();
-    setTimeout(() => subscribeToMessages(convKey), 5000);
+    setTimeout(() => subscribeToMessages(convKey, container), 5000);
   };
 }
-
