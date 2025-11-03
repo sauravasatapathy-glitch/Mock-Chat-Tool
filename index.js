@@ -1,5 +1,5 @@
 // ============================
-// index.js (Updated - Duplicate Fix)
+// index.js (Updated Version)
 // ============================
 
 import { getUserFromToken, getAuthHeader } from "./authHelper.js";
@@ -23,9 +23,6 @@ if (!session) {
 const { user, token, role } = session;
 const authHeader = getAuthHeader();
 
-// ✅ GLOBAL cache to prevent duplicate rendering
-const messageSeenRegistry = {}; // { convKey: Set(ids) }
-
 // === Role-based layout ===
 if (role === "agent") {
   rightPane.style.display = "none";
@@ -40,22 +37,22 @@ if (role === "agent") {
 const logoutBtn = document.createElement("button");
 logoutBtn.textContent = "Logout";
 logoutBtn.style.cssText = `
-  position:fixed; top:10px; right:10px;
-  padding:0.4rem 0.8rem; background:#dc2626;
-  color:white; border:none; border-radius:0.5rem;
-  cursor:pointer; z-index:1000;
+  position:fixed;top:10px;right:10px;
+  padding:0.4rem 0.8rem;background:#dc2626;
+  color:white;border:none;border-radius:0.5rem;
+  cursor:pointer;z-index:1000;
 `;
 logoutBtn.onclick = logout;
 document.body.appendChild(logoutBtn);
 
-// === Load conversations on startup ===
+// Load conversation lists
 loadConversations();
 
 // ========================================================
 // === FUNCTIONS ==========================================
 // ========================================================
 
-// 🟦 Load all conversations
+// Load all conversations
 async function loadConversations() {
   try {
     const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
@@ -79,7 +76,6 @@ async function loadConversations() {
   }
 }
 
-// 🟦 Render conversation lists
 function renderList(id, items, emptyText) {
   const list = document.getElementById(id);
   list.innerHTML = "";
@@ -97,7 +93,7 @@ function renderList(id, items, emptyText) {
   });
 }
 
-// 🟦 Create a new conversation
+// Create conversation
 async function createConversation(trainerName, associateName) {
   try {
     const res = await fetch(`${API_BASE_URL}/conversations`, {
@@ -116,46 +112,33 @@ async function createConversation(trainerName, associateName) {
   }
 }
 
-// 🟦 Open a specific conversation
+// ========================
+// ✅ GLOBAL SEEN MESSAGES STORE
+// ========================
+let seenMessages = new Set();
+let activeStream = null;
+
+// Open a conversation
 async function openConversation(conv) {
+  if (activeStream) {
+    activeStream.close();
+    activeStream = null;
+  }
+
+  seenMessages.clear();
+
   chatContent.innerHTML = `
-    <div id="chatContainer" style="
-      display:flex; flex-direction:column; height:80vh; width:100%;
-      background:#f9fafb; border-radius:10px; border:1px solid #e2e8f0;
-      box-shadow:0 1px 3px rgba(0,0,0,0.05); overflow:hidden;
-    ">
-      <div id="chatHeader" style="
-        flex-shrink:0; background:#2563eb; color:white; padding:0.75rem 1rem;
-        font-weight:600; text-align:center;
-      ">
+    <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:#f9fafb;border-radius:10px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.05);overflow:hidden;">
+      <div id="chatHeader" style="flex-shrink:0;background:#2563eb;color:white;padding:0.75rem 1rem;font-weight:600;text-align:center;">
         ${conv.trainer_name} ↔ ${conv.associate_name}
-        <div style="font-size:0.8rem; opacity:0.9;">Conversation Key: ${conv.conv_key}</div>
+        <div style="font-size:0.8rem;opacity:0.9;">Conversation Key: ${conv.conv_key}</div>
       </div>
 
-      <div id="messages" data-conv-key="${conv.conv_key}" style="
-        flex:1; overflow-y:auto; padding:1rem; display:flex;
-        flex-direction:column; gap:0.4rem; background:white; scroll-behavior:smooth;
-      "></div>
+      <div id="messages" data-conv-key="${conv.conv_key}" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.4rem;background:white;scroll-behavior:smooth;"></div>
 
-      <div id="chatInputArea" style="
-        flex-shrink:0; display:flex; align-items:flex-end; padding:0.5rem;
-        border-top:1px solid #e5e7eb; background:#f8fafc; gap:0.5rem;
-      ">
-        <textarea id="chatInput" placeholder="Type a message..." style="
-          flex:1; border:1px solid #cbd5e1; border-radius:0.5rem;
-          padding:0.6rem 0.75rem; font-size:0.95rem; outline:none;
-          resize:none; height:44px; font-family:inherit; max-height:120px;
-        "></textarea>
-        <button id="sendBtn" style="
-          background:#2563eb; color:white; border:none; border-radius:0.5rem;
-          padding:0.6rem 1.2rem; font-size:0.95rem; cursor:pointer; height:44px;
-          flex-shrink:0; transition:background 0.2s, transform 0.1s;
-        "
-          onmouseover="this.style.background='#1e40af'"
-          onmouseout="this.style.background='#2563eb'"
-          onmousedown="this.style.transform='scale(0.96)'"
-          onmouseup="this.style.transform='scale(1)'"
-        >Send</button>
+      <div id="chatInputArea" style="flex-shrink:0;display:flex;align-items:flex-end;padding:0.5rem;border-top:1px solid #e5e7eb;background:#f8fafc;gap:0.5rem;">
+        <textarea id="chatInput" placeholder="Type a message..." style="flex:1;border:1px solid #cbd5e1;border-radius:0.5rem;padding:0.6rem 0.75rem;font-size:0.95rem;outline:none;resize:none;height:44px;max-height:120px;"></textarea>
+        <button id="sendBtn" style="background:#2563eb;color:white;border:none;border-radius:0.5rem;padding:0.6rem 1.2rem;font-size:0.95rem;cursor:pointer;height:44px;">Send</button>
       </div>
     </div>
   `;
@@ -164,19 +147,11 @@ async function openConversation(conv) {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendBtn");
 
-  // ✅ Create registry for this specific conversation if not exists
-  if (!messageSeenRegistry[conv.conv_key]) {
-    messageSeenRegistry[conv.conv_key] = new Set();
-  }
-
-  // === Load initial messages ===
   await loadMessages(conv.conv_key);
   container.scrollTop = container.scrollHeight;
 
-  // === Subscribe to SSE live updates ===
-  subscribeToMessages(conv.conv_key, container);
+  subscribeToMessages(conv.conv_key);
 
-  // === Handle sending message ===
   async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
@@ -184,16 +159,11 @@ async function openConversation(conv) {
     try {
       const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
 
-      // ✅ Mark seen immediately so SSE doesn't re-render it
-      messageSeenRegistry[conv.conv_key].add(newMsg.id);
+      // ✅ Render locally
+      renderMessage(container, newMsg);
 
-      renderMessage(container, {
-        id: newMsg.id,
-        senderName: newMsg.sender_name,
-        senderRole: newMsg.role,
-        text: newMsg.text,
-        timestamp: newMsg.timestamp,
-      });
+      // ✅ Mark as seen so SSE does NOT re-render it
+      seenMessages.add(newMsg.id);
 
       container.scrollTop = container.scrollHeight;
       input.value = "";
@@ -204,7 +174,6 @@ async function openConversation(conv) {
   }
 
   sendBtn.addEventListener("click", handleSend);
-
   input.addEventListener("keydown", async (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -216,34 +185,25 @@ async function openConversation(conv) {
   });
 }
 
-// 🟦 Load messages
+// Load messages
 async function loadMessages(convKey) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/messages?convKey=${convKey}`, {
-      headers: { ...authHeader },
-    });
+  const res = await fetch(`${API_BASE_URL}/messages?convKey=${convKey}`, {
+    headers: { ...authHeader },
+  });
 
-    const messages = await res.json();
-    if (!res.ok) throw new Error(messages.error || "Failed to load messages");
+  const messages = await res.json();
+  const container = document.getElementById("messages");
+  container.innerHTML = "";
 
-    const container = document.getElementById("messages");
-    container.innerHTML = "";
+  messages.forEach((msg) => {
+    seenMessages.add(msg.id);
+    renderMessage(container, msg);
+  });
 
-    const seen = messageSeenRegistry[convKey] || new Set();
-
-    messages.forEach((msg) => {
-      seen.add(msg.id); // ✅ preload all IDs so SSE doesn't re-display them
-      renderMessage(container, msg);
-    });
-
-    messageSeenRegistry[convKey] = seen;
-    container.scrollTop = container.scrollHeight;
-  } catch (err) {
-    console.error("Error loading messages:", err);
-  }
+  container.scrollTop = container.scrollHeight;
 }
 
-// 🟦 Send message
+// Send message
 async function sendMessage(convKey, senderName, senderRole, text) {
   const response = await fetch(`${API_BASE_URL}/messages`, {
     method: "POST",
@@ -251,24 +211,19 @@ async function sendMessage(convKey, senderName, senderRole, text) {
     body: JSON.stringify({ convKey, senderName, senderRole, text }),
   });
 
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Failed to send message");
-
-  return data;
+  return await response.json();
 }
 
-// 🟦 Render a single message
+// Render single message
 function renderMessage(container, msg) {
   const currentUser = JSON.parse(localStorage.getItem("user"));
   const currentRole = localStorage.getItem("role");
 
-  const sender = msg.senderName || msg.sender_name;
-  const senderRole = msg.senderRole || msg.role;
-  const isSelf = sender === currentUser?.name && senderRole === currentRole;
+  const sender = msg.sender_name || msg.senderName;
+  const isSelf = sender === currentUser?.name && msg.role === currentRole;
 
   const msgDiv = document.createElement("div");
   msgDiv.className = `message ${isSelf ? "self" : "other"}`;
-
   msgDiv.innerHTML = `
     <strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong><br>
     ${msg.text}
@@ -280,32 +235,32 @@ function renderMessage(container, msg) {
   container.appendChild(msgDiv);
 }
 
-// 🟦 Subscribe to live updates (SSE)
-function subscribeToMessages(convKey, container) {
+// Subscribe to SSE
+function subscribeToMessages(convKey) {
   const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
+  activeStream = evtSource;
 
   evtSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      const seen = messageSeenRegistry[convKey];
+    const data = JSON.parse(event.data);
+    const container = document.getElementById("messages");
+    if (!container) return;
 
-      if (data.type === "new") {
-        data.messages.forEach((msg) => {
-          if (!seen.has(msg.id)) {
-            seen.add(msg.id);
-            renderMessage(container, msg);
-          }
-        });
-      }
+    const renderUnseen = (msgs) => {
+      msgs.forEach((msg) => {
+        if (!seenMessages.has(msg.id)) {
+          seenMessages.add(msg.id);
+          renderMessage(container, msg);
+        }
+      });
       container.scrollTop = container.scrollHeight;
-    } catch (err) {
-      console.error("Error parsing SSE message:", err);
-    }
+    };
+
+    if (data.type === "init") renderUnseen(data.messages);
+    if (data.type === "new") renderUnseen(data.messages);
   };
 
-  evtSource.onerror = (err) => {
-    console.warn("SSE disconnected. Retrying in 5s...", err);
+  evtSource.onerror = () => {
     evtSource.close();
-    setTimeout(() => subscribeToMessages(convKey, container), 5000);
+    setTimeout(() => subscribeToMessages(convKey), 2000);
   };
 }
