@@ -24,11 +24,15 @@
 }
 
 /* Messages layout */
-#messages {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+#messages { display:flex; flex-direction:column; gap:0.6rem; padding:1rem; overflow:auto; }
+
+.message { display:flex; max-width:100%; }
+.message > div { max-width:72%; padding:0.6rem 0.9rem; border-radius:12px; word-wrap:break-word; }
+.message.self { justify-content:flex-end; }
+.message.self > div { background:#2563eb; color:#fff; border-bottom-right-radius:4px; }
+.message.other { justify-content:flex-start; }
+.message.other > div { background:#f1f5f9; color:#0b1220; border-bottom-left-radius:4px; }
+
 
 .message {
   display: flex;
@@ -209,6 +213,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
