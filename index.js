@@ -202,6 +202,21 @@ async function loadMessages(convKey) {
 
   container.scrollTop = container.scrollHeight;
 }
+// sound notification (small beep)
+const notifAudio = (() => {
+  const a = new Audio();
+  // tiny base64 click sound (replace with hosted asset if you want)
+  a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA"; 
+  return a;
+})();
+
+function playNotification() {
+  try { notifAudio.play().catch(() => {}); } catch(e){/*ignore*/ }
+}
+
+function isNearBottom(el, threshold = 120) {
+  return el.scrollHeight - (el.scrollTop + el.clientHeight) < threshold;
+}
 
 // Send message
 async function sendMessage(convKey, senderName, senderRole, text) {
@@ -210,57 +225,151 @@ async function sendMessage(convKey, senderName, senderRole, text) {
     headers: { "Content-Type": "application/json", ...authHeader },
     body: JSON.stringify({ convKey, senderName, senderRole, text }),
   });
-
-  return await response.json();
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Failed to send message");
+  return data; // inserted message {id, conv_key, sender_name, role, text, timestamp}
 }
+
 
 // Render single message
-function renderMessage(container, msg) {
+function renderMessage(container, msg, opts = { scroll: true }) {
   const currentUser = JSON.parse(localStorage.getItem("user"));
   const currentRole = localStorage.getItem("role");
+  const sender = msg.sender_name || msg.senderName || msg.sender || "Unknown";
+  const senderRole = msg.role || msg.senderRole || "unknown";
+  const text = msg.text || "";
+  const isSelf = sender === currentUser?.name && senderRole === currentRole;
 
-  const sender = msg.sender_name || msg.senderName;
-  const isSelf = sender === currentUser?.name && msg.role === currentRole;
+  const wrapper = document.createElement("div");
+  wrapper.className = `message ${isSelf ? "self" : "other"}`;
+  wrapper.style.display = "flex";
+  wrapper.style.justifyContent = isSelf ? "flex-end" : "flex-start";
+  wrapper.dataset.id = msg.id;
 
-  const msgDiv = document.createElement("div");
-  msgDiv.className = `message ${isSelf ? "self" : "other"}`;
-  msgDiv.innerHTML = `
-    <strong style="font-size:0.8rem;opacity:0.8;">${sender}</strong><br>
-    ${msg.text}
-    <div style="font-size:0.7rem;opacity:0.7;margin-top:0.25rem;text-align:${isSelf ? "right" : "left"};">
-      ${new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-    </div>
-  `;
+  const bubble = document.createElement("div");
+  bubble.style.background = isSelf ? "#2563eb" : "#e2e8f0";
+  bubble.style.color = isSelf ? "#fff" : "#111827";
+  bubble.style.padding = "0.6rem 0.9rem";
+  bubble.style.borderRadius = "12px";
+  bubble.style.maxWidth = "72%";
+  bubble.style.boxShadow = "0 1px 2px rgba(0,0,0,0.06)";
+  bubble.innerHTML = `<strong style="font-size:0.85rem;opacity:0.85">${sender}</strong><div style="margin-top:0.25rem;white-space:pre-wrap;">${escapeHtml(text)}</div>
+    <div style="font-size:0.7rem;opacity:0.65;margin-top:0.35rem;text-align:${isSelf ? "right" : "left"}">
+      ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+    </div>`;
 
-  container.appendChild(msgDiv);
+  wrapper.appendChild(bubble);
+  container.appendChild(wrapper);
+  if (opts.scroll) container.scrollTop = container.scrollHeight;
+}
+/* ---------- simple escape helper ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+}
+let typingTimer = null;
+function initTypingHandler(convKey) {
+  const input = document.getElementById("chatInput");
+  let isTyping = false;
+
+  input.addEventListener("input", () => {
+    if (!convKey) return;
+    // send typing = true (debounced)
+    if (!isTyping) {
+      isTyping = true;
+      fetch(`${API_BASE_URL}/typing`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json", ...authHeader},
+        body: JSON.stringify({ convKey, userName: user.name, role })
+      }).catch(()=>{});
+    }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      isTyping = false;
+      fetch(`${API_BASE_URL}/typing`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json", ...authHeader},
+        body: JSON.stringify({ convKey, userName: user.name, role, typing: false })
+      }).catch(()=>{});
+    }, 800); // stop typing after 800ms of inactivity
+  });
 }
 
+function showTypingIndicator(typingRows) {
+  // typingRows: [{user_name, role, updated_at}, ...]
+  const indicator = document.getElementById("typingIndicator");
+  if (!indicator) return;
+  const names = typingRows.map(r => r.user_name).filter(n => n !== user.name);
+  indicator.textContent = names.length ? `${names.join(", ")} is typing…` : "";
+}
 // Subscribe to SSE
 function subscribeToMessages(convKey) {
-  const evtSource = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
-  activeStream = evtSource;
+  // close previous if any
+  if (window.currentEventSource) {
+    try { window.currentEventSource.close(); } catch(e) {}
+    window.currentEventSource = null;
+  }
 
-  evtSource.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    const container = document.getElementById("messages");
-    if (!container) return;
+  const container = document.getElementById("messages");
+  const seen = new Set(); // keep per-connection seen ids
 
-    const renderUnseen = (msgs) => {
-      msgs.forEach((msg) => {
-        if (!seenMessages.has(msg.id)) {
-          seenMessages.add(msg.id);
-          renderMessage(container, msg);
+  // If there are existing message divs with data-id, populate seen
+  document.querySelectorAll("#messages .message[data-id]").forEach(n => {
+    const id = n.dataset.id;
+    if (id) seen.add(id);
+  });
+
+  const evt = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
+  window.currentEventSource = evt;
+
+  evt.onmessage = (ev) => {
+    try {
+      const payload = JSON.parse(ev.data);
+
+      if (payload.type === "init" && Array.isArray(payload.messages)) {
+        container.innerHTML = "";
+        seen.clear();
+        payload.messages.forEach(m => {
+          seen.add(String(m.id));
+          renderMessage(container, m, { scroll: false });
+        });
+        container.scrollTop = container.scrollHeight;
+        return;
+      }
+
+      if (payload.type === "new" && Array.isArray(payload.messages)) {
+        const shouldScroll = isNearBottom(container, 200);
+        for (const m of payload.messages) {
+          if (!seen.has(String(m.id))) {
+            seen.add(String(m.id));
+            renderMessage(container, m, { scroll: false });
+            // notification only for messages not by me
+            const currentUser = JSON.parse(localStorage.getItem("user"));
+            if (m.sender_name !== currentUser?.name) {
+              playNotification();
+              // desktop notification
+              if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+                new Notification(m.sender_name, { body: m.text.length > 100 ? m.text.slice(0,97)+"..." : m.text });
+              }
+            }
+          }
         }
-      });
-      container.scrollTop = container.scrollHeight;
-    };
+        if (shouldScroll) container.scrollTop = container.scrollHeight;
+        return;
+      }
 
-    if (data.type === "init") renderUnseen(data.messages);
-    if (data.type === "new") renderUnseen(data.messages);
+      if (payload.type === "typing" && Array.isArray(payload.typing)) {
+        // show typing hint (frontend should implement showTyping)
+        showTypingIndicator(payload.typing);
+        return;
+      }
+    } catch (err) {
+      console.error("SSE parse error:", err, ev.data);
+    }
   };
 
-  evtSource.onerror = () => {
-    evtSource.close();
-    setTimeout(() => subscribeToMessages(convKey), 2000);
+  evt.onerror = (err) => {
+    console.warn("SSE disconnected. reconnecting in 3s...", err);
+    try { evt.close(); } catch(e) {}
+    setTimeout(() => subscribeToMessages(convKey), 3000);
   };
 }
