@@ -1,8 +1,8 @@
-// index.js (replace existing frontend index.js)
+// index.js (fixed & ready to paste)
 import { getUserFromToken, getAuthHeader } from "./authHelper.js";
 import { checkAuth, logout } from "./authGuard.js";
 
-const API_BASE_URL = "https://mock-chat-backend.vercel.app/api"; // backend
+const API_BASE_URL = "https://mock-chat-backend.vercel.app/api";
 
 // DOM
 const leftPane = document.getElementById("left-pane");
@@ -10,6 +10,7 @@ const rightPane = document.getElementById("right-pane");
 const chatContent = document.getElementById("chatContent");
 const newChatBtn = document.getElementById("newChatBtn");
 
+// AUTH
 const session = checkAuth(["admin", "trainer", "agent"]);
 if (!session) {
   window.location.href = "login.html";
@@ -18,7 +19,7 @@ if (!session) {
 const { user, token, role } = session;
 const authHeader = getAuthHeader();
 
-// hide right pane for agents
+// Hide right pane for agents
 if (role === "agent") rightPane.style.display = "none";
 else {
   newChatBtn.addEventListener("click", () => {
@@ -34,39 +35,65 @@ logoutBtn.style.cssText = "position:fixed;top:10px;right:10px;padding:0.4rem 0.8
 logoutBtn.onclick = logout;
 document.body.appendChild(logoutBtn);
 
-// global SSE and seen tracking
+// Global SSE + seen tracking
 let currentEventSource = null;
 let currentConvKey = null;
 let seenIds = new Set(); // ids displayed in UI for current conversation
 
-// load conversations initially
-loadConversations();
+// Notification permission request (non-blocking)
+if ("Notification" in window && Notification.permission === "default") {
+  Notification.requestPermission().catch(() => {});
+}
 
-// ---------- Conversations ----------
+// tiny beep data URI
+const notifAudio = (() => {
+  const a = new Audio();
+  a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA";
+  return a;
+})();
+function playNotification() { try { notifAudio.play().catch(()=>{}); } catch(e){} }
+
+// ---------- Load conversations (role-aware) ----------
 async function loadConversations() {
   try {
-    const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
-      headers: { ...authHeader },
-    });
+    let url;
+    if (role === "admin") {
+      url = `${API_BASE_URL}/conversations?all=true`;
+    } else if (role === "trainer") {
+      url = `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
+    } else {
+      // agent
+      url = `${API_BASE_URL}/conversations?associate=${encodeURIComponent(user.name)}`;
+    }
+
+    const res = await fetch(url, { headers: { ...authHeader } });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to load conversations");
 
-    // render both lists (myConversations + activeConversations)
-    const myConvs = data.filter(c => (role === "agent" ? c.associate_name === user.name : c.trainer_name === user.name));
-    const activeConvs = data.filter(c => !c.ended);
-
+    // For admin we show all; for others filter is already applied by backend (but keep safe filter here)
+    const myConvs = Array.isArray(data) ? data : [];
     renderList("myConversations", myConvs);
+    // Active pane (everyone can see active list - admin may want all active)
+    const activeConvs = myConvs.filter(c => !c.ended);
     renderList("activeConversations", activeConvs);
   } catch (err) {
     console.error("Error loading conversations:", err);
+    // If 401/invalid token show friendly message & redirect
+    if (err.message && err.message.toLowerCase().includes("invalid token")) {
+      alert("Session invalid. Please login again.");
+      logout();
+    }
   }
 }
 
+// ---------- Render conversation lists ----------
 function renderList(id, items) {
   const ul = document.getElementById(id);
+  if (!ul) return;
   ul.innerHTML = "";
-  if (!items.length) {
-    ul.innerHTML = "<li>No conversations</li>";
+
+  if (!items || items.length === 0) {
+    ul.innerHTML = `<li style="opacity:.7;padding:.6rem;">No conversations</li>`;
     return;
   }
 
@@ -76,20 +103,23 @@ function renderList(id, items) {
     li.style.justifyContent = "space-between";
     li.style.alignItems = "center";
     li.style.gap = "8px";
+    li.style.padding = ".5rem";
 
     const left = document.createElement("div");
     left.style.flex = "1";
     left.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
 
-    // bold if unread
-    if (c.unread_count && c.unread_count > 0) {
-      left.style.fontWeight = "700";
-    }
+    if (c.unread_count && c.unread_count > 0) left.style.fontWeight = "700";
 
     const badge = document.createElement("div");
     badge.className = "conv-badge";
-    badge.style.display = c.unread_count && c.unread_count > 0 ? "inline-block" : "none";
-    badge.textContent = c.unread_count;
+    badge.style.display = (c.unread_count && c.unread_count > 0) ? "inline-block" : "none";
+    badge.style.background = "#ef4444";
+    badge.style.color = "#fff";
+    badge.style.padding = "0.18rem 0.5rem";
+    badge.style.borderRadius = "999px";
+    badge.style.fontSize = "0.85rem";
+    badge.textContent = c.unread_count || "";
 
     li.appendChild(left);
     li.appendChild(badge);
@@ -118,11 +148,12 @@ async function createConversation(trainerName, associateName) {
 
 // ---------- Open conversation (UI + SSE) ----------
 async function openConversation(conv) {
-  // close any existing SSE
+  // close previous SSE
   if (currentEventSource) {
-    try { currentEventSource.close(); } catch (e) {}
+    try { currentEventSource.close(); } catch(e){}
     currentEventSource = null;
   }
+
   currentConvKey = conv.conv_key;
   seenIds = new Set();
 
@@ -144,29 +175,42 @@ async function openConversation(conv) {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("sendBtn");
 
+  // load history (normal GET)
   await loadMessages(conv.conv_key);
 
-  // After initial load, mark all as read for this user
+  // mark as read (server updates unread table)
   await markConversationRead(conv.conv_key);
 
-  // subscribe SSE
+  // subscribe SSE live
   subscribeToMessages(conv.conv_key);
 
-  // send handler (backend returns inserted message row)
+  // send handler - we will rely on server-returned object and add its id to seenIds
   async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
     try {
       const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
-      // add to seen so SSE doesn't re-render it
-      seenIds.add(String(newMsg.id));
-      // render that message using server-returned row
-      renderMessage(container, newMsg, { scroll: true });
+      if (!newMsg || !newMsg.id) {
+        // fallback: render optimistic and trust SSE to fill in (but keep seen guard)
+        renderMessage(container, {
+          id: `tmp-${Date.now()}`,
+          sender_name: user.name,
+          role,
+          text,
+          timestamp: new Date().toISOString()
+        }, { scroll: true });
+      } else {
+        // Mark seen so SSE doesn't duplicate
+        seenIds.add(String(newMsg.id));
+        renderMessage(container, newMsg, { scroll: true });
+      }
       input.value = "";
-      // mark read (if message from me it's read by me)
+      input.style.height = "44px";
+      // mark read after send
       await markConversationRead(conv.conv_key);
     } catch (err) {
       console.error("Send failed:", err);
+      alert("Failed to send message: " + (err.message || err));
     }
   }
 
@@ -182,18 +226,20 @@ async function openConversation(conv) {
   });
 }
 
-// ---------- Load messages (normal fetch) ----------
+// ---------- Load messages (normal GET) ----------
 async function loadMessages(convKey) {
   try {
     const res = await fetch(`${API_BASE_URL}/messages?convKey=${convKey}`, {
       headers: { ...authHeader },
     });
     const rows = await res.json();
-    if (!res.ok) throw new Error(rows.error || "Failed to load");
+    if (!res.ok) throw new Error(rows.error || "Failed to load messages");
 
     const container = document.getElementById("messages");
+    if (!container) return;
     container.innerHTML = "";
     seenIds.clear();
+
     rows.forEach(r => {
       renderMessage(container, r, { scroll: false });
       seenIds.add(String(r.id));
@@ -218,18 +264,15 @@ async function sendMessage(convKey, senderName, senderRole, text) {
 
 // ---------- Render message ----------
 function renderMessage(container, msg, opts = { scroll: true }) {
-  const currentUser = user;
-  const currentRole = role;
   const sender = msg.sender_name || msg.senderName || msg.sender || "Unknown";
   const senderRole = msg.role || msg.senderRole || "unknown";
-  const isSelf = (sender === currentUser?.name) && (senderRole === currentRole);
+  const isSelf = (sender === user.name) && (senderRole === role);
 
-  // Build DOM
   const wrapper = document.createElement("div");
   wrapper.className = `message ${isSelf ? "self" : "other"}`;
   wrapper.style.display = "flex";
   wrapper.style.justifyContent = isSelf ? "flex-end" : "flex-start";
-  wrapper.dataset.id = msg.id;
+  if (msg.id) wrapper.dataset.id = msg.id;
 
   const bubble = document.createElement("div");
   bubble.style.background = isSelf ? "#2563eb" : "#e2e8f0";
@@ -240,7 +283,7 @@ function renderMessage(container, msg, opts = { scroll: true }) {
   bubble.style.boxShadow = "0 1px 2px rgba(0,0,0,0.06)";
   bubble.innerHTML = `<strong style="font-size:0.85rem;opacity:0.85">${escapeHtml(sender)}</strong>
     <div style="margin-top:0.25rem;white-space:pre-wrap;">${escapeHtml(msg.text || "")}</div>
-    <div style="font-size:0.7rem;opacity:0.65;margin-top:0.35rem;text-align:${isSelf ? "right":"left"}">
+    <div style="font-size:0.7rem;opacity:0.65;margin-top:0.35rem;text-align:${isSelf ? "right" : "left"}">
       ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
     </div>`;
 
@@ -257,33 +300,32 @@ function escapeHtml(s) {
 // ---------- Mark conversation read ----------
 async function markConversationRead(convKey) {
   try {
-    // POST with convKey + userName (server will insert new rows)
     const res = await fetch(`${API_BASE_URL}/messageRead`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeader },
       body: JSON.stringify({ convKey, userName: user.name }),
     });
-    const data = await res.json();
     if (res.ok) {
-      // refresh conversation badges
-      loadConversations();
+      // refresh badges
+      await loadConversations();
     }
   } catch (err) {
     console.error("markConversationRead error:", err);
   }
 }
 
-// ---------- SSE subscription ----------
+// ---------- SSE subscribe ----------
 function subscribeToMessages(convKey) {
-  // close previous stream
+  // close previous
   if (currentEventSource) {
-    try { currentEventSource.close(); } catch (e) {}
+    try { currentEventSource.close(); } catch(e){}
     currentEventSource = null;
   }
 
   const container = document.getElementById("messages");
   if (!container) return;
 
+  // Create EventSource (no custom headers possible); make sure backend CORS allows origin
   const es = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
   currentEventSource = es;
 
@@ -296,41 +338,38 @@ function subscribeToMessages(convKey) {
         seenIds.clear();
         payload.messages.forEach(m => {
           renderMessage(container, m, { scroll: false });
-          seenIds.add(String(m.id));
+          if (m.id) seenIds.add(String(m.id));
         });
         container.scrollTop = container.scrollHeight;
         return;
       }
 
       if (payload.type === "new" && Array.isArray(payload.messages)) {
-        // only render messages we haven't seen
-        const shouldScroll = isNearBottom(container, 200);
+        const shouldScroll = isNearBottom(container, 150);
         for (const m of payload.messages) {
-          if (!seenIds.has(String(m.id))) {
-            seenIds.add(String(m.id));
+          // skip messages we've already displayed (send path added ID into seenIds)
+          if (!m.id || !seenIds.has(String(m.id))) {
+            if (m.id) seenIds.add(String(m.id));
             renderMessage(container, m, { scroll: false });
 
-            // If message is by someone else and the window is not hidden -> mark read right away (and refresh badges)
-            if ((m.sender_name !== user.name) && (document.hidden === false)) {
-              await markConversationRead(convKey);
-            }
-
-            // Desktop notification if tab hidden and not from me
-            if ((m.sender_name !== user.name) && document.hidden) {
+            // notify + play sound for messages not by me
+            if (m.sender_name !== user.name) {
               playNotification();
-              if (Notification && Notification.permission === "granted") {
+              if (document.hidden && "Notification" in window && Notification.permission === "granted") {
                 new Notification(m.sender_name, { body: m.text.length > 120 ? m.text.slice(0,120)+"..." : m.text });
               }
             }
           }
         }
         if (shouldScroll) container.scrollTop = container.scrollHeight;
+
+        // refresh conversation badges in background (unread counts might have changed)
+        loadConversations().catch(() => {});
         return;
       }
 
-      if (payload.type === "typing" && Array.isArray(payload.typing)) {
-        // optional: show typing indicator
-        // showTypingIndicator(payload.typing)
+      if (payload.type === "typing") {
+        // optional: hook in showTypingIndicator(payload.typing)
       }
     } catch (err) {
       console.error("SSE parse error:", err, ev.data);
@@ -338,26 +377,16 @@ function subscribeToMessages(convKey) {
   };
 
   es.onerror = (err) => {
-    console.warn("SSE disconnected, reconnecting in 3s", err);
-    try { es.close(); } catch (e) {}
+    console.warn("SSE disconnected. reconnecting in 3s", err);
+    try { es.close(); } catch(e){}
     setTimeout(() => subscribeToMessages(convKey), 3000);
   };
 }
 
-// ---------- small helpers ----------
+// ---------- Helpers ----------
 function isNearBottom(el, threshold = 120) {
   return el.scrollHeight - (el.scrollTop + el.clientHeight) < threshold;
 }
 
-// tiny beep
-const notifAudio = (() => {
-  const a = new Audio();
-  a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA";
-  return a;
-})();
-function playNotification() { try { notifAudio.play().catch(()=>{}); } catch(e){} }
-
-// Request notification permission on load if not denied
-if ("Notification" in window && Notification.permission === "default") {
-  Notification.requestPermission().catch(()=>{});
-}
+// Initial load
+loadConversations();
