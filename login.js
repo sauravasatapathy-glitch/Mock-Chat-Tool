@@ -42,16 +42,31 @@ loginBtn.addEventListener("click", async () => {
 
   try {
     if (isAgentMode) {
-      // 🔹 Agent login (no password)
+      // 🔹 Agent login (no password) - fetch associate name from backend
       const convKey = convKeyInput.value.trim();
       if (!convKey) {
         errorDiv.textContent = "Conversation Key required.";
         return;
       }
 
+      const resp = await fetch(`${API_BASE_URL}/agent-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ convKey }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        errorDiv.textContent = data.error || "Invalid conversation key";
+        return;
+      }
+
+      // store in same shape your app expects
       localStorage.setItem("role", "agent");
-      localStorage.setItem("convKey", convKey);
-      localStorage.setItem("user", JSON.stringify({ name: "Agent User" }));
+      localStorage.setItem("convKey", data.convKey);
+      localStorage.setItem("user", JSON.stringify({ name: data.agentName }));
+      // we also store trainerName if you want to show it on UI quick
+      if (data.trainerName) localStorage.setItem("trainerName", data.trainerName);
 
       window.location.href = "index.html";
       return;
@@ -65,7 +80,7 @@ loginBtn.addEventListener("click", async () => {
       return;
     }
 
-    // --- Fetch API with CORS-safe query param ---
+    // --- Fetch API login ---
     const response = await fetch(`${API_BASE_URL}/auth?path=login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
