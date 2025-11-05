@@ -22,6 +22,29 @@
   60% { transform: scale(1.05); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* Conversation badge */
+.conv-badge {
+  min-width: 26px;
+  height: 26px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:#2563eb;
+  color:white;
+  font-weight:700;
+  padding:0 8px;
+  font-size:0.85rem;
+}
+
+/* Conversation li bold when unread (we set inline style too) */
+#myConversations li strong,
+#activeConversations li strong { font-weight: 600; }
+
+/* Message bubble minor polish */
+.message > div { transition: transform 0.05s ease; }
+.message.self > div { border-bottom-right-radius: 4px; }
+.message.other > div { border-bottom-left-radius: 4px; }
 
 /* Messages layout */
 #messages { display:flex; flex-direction:column; gap:0.6rem; padding:1rem; overflow:auto; }
@@ -213,6 +236,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
