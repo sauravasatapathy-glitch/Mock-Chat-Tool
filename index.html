@@ -5,16 +5,17 @@
   <title>Lavender Chat Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Lucide Icons -->
+  <!-- Lucide Icons (Global Import) -->
   <script type="module">
-    import { createIcons, Home, Archive, PlusCircle, Clock, BarChart2, LogOut } from "https://cdn.jsdelivr.net/npm/lucide@latest/+esm";
-    window.LucideIcons = { Home, Archive, PlusCircle, Clock, BarChart2, LogOut };
-    window.createIcons = createIcons;
-    window.addEventListener("DOMContentLoaded", () => createIcons());
+    import { createIcons, icons } from "https://unpkg.com/lucide@latest/dist/esm/lucide.js";
+    window.lucide = { createIcons, icons };
+    document.addEventListener("DOMContentLoaded", () => {
+      createIcons({ icons });
+    });
   </script>
 
   <style>
-    /* --- Base Layout --- */
+    /* === Lavender Unified Theme === */
     * {
       box-sizing: border-box;
     }
@@ -27,17 +28,10 @@
       overflow: hidden;
       color: #1e293b;
     }
-    
-    header, #chatHeader, .left-pane-header {
-      background-color: #2563eb;
-      color: white;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-    }
 
     /* --- Nav Rail --- */
     #nav-rail {
-      width: 72px;
+      width: 80px;
       background: #111827;
       color: white;
       display: flex;
@@ -45,9 +39,9 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.75rem 0;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
     }
 
-    /* Top section (nav buttons) */
     #nav-top {
       display: flex;
       flex-direction: column;
@@ -56,15 +50,15 @@
     }
 
     .nav-item {
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.2s ease, transform 0.15s ease;
       position: relative;
+      transition: all 0.25s ease;
     }
 
     .nav-item:hover {
@@ -82,6 +76,27 @@
       stroke: white;
     }
 
+    .nav-item::after {
+      content: attr(title);
+      position: absolute;
+      left: 70px;
+      opacity: 0;
+      background: #1e3a8a;
+      color: white;
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      transform: translateX(-10px);
+      pointer-events: none;
+    }
+
+    .nav-item:hover::after {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
     .badge {
       position: absolute;
       top: 6px;
@@ -94,7 +109,6 @@
       display: none;
     }
 
-    /* Bottom section (logout) */
     #nav-bottom {
       display: flex;
       flex-direction: column;
@@ -106,8 +120,8 @@
       background: #dc2626;
       border: none;
       color: white;
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       border-radius: 12px;
       cursor: pointer;
       transition: background 0.25s ease;
@@ -120,35 +134,16 @@
       background: #b91c1c;
     }
 
-    #logoutBtn svg {
-      width: 22px;
-      height: 22px;
-      stroke: white;
-    }
-
-    /* --- Layout Columns --- */
+    /* --- Left Pane --- */
     #left-pane {
       width: 280px;
-      background: #f8fafc;
-      background-color: #f0f4ff;
+      background: #f0f4ff;
       border-right: 2px solid #d1d5db;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
     }
 
-    #chat-pane {
-      background: #f1f5f9;
-      background-color: #ffffff;
-      flex: 1;
-      display: flex;
-      box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
-      flex-direction: column;
-      padding: 1rem;
-      overflow: hidden;
-    }
-
-    /* --- Headers --- */
     h3 {
       background: #1e3a8a;
       color: white;
@@ -158,7 +153,6 @@
       font-size: 1rem;
     }
 
-    /* --- Lists --- */
     ul {
       list-style: none;
       margin: 0;
@@ -174,7 +168,26 @@
       background: #e0ecff;
     }
 
-    /* --- Chat --- */
+    /* --- Chat Pane --- */
+    #chat-pane {
+      background-color: #ffffff;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    #chatHeader {
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+      text-align: center;
+      padding: 0.75rem;
+      border-radius: 8px 8px 0 0;
+    }
+
     #chatContent {
       flex: 1;
       border: 1px solid #e2e8f0;
@@ -191,14 +204,13 @@
 
     /* --- Messages --- */
     #messages {
-      background-color: #fafbff;
+      flex: 1;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
       padding: 1rem;
-      overflow-y: auto;
-      background: #fff;
-      flex: 1;
+      background: #fafbff;
     }
 
     .message {
@@ -227,14 +239,12 @@
 
     .self .bubble {
       background: #2563eb;
-      background-color: #2563eb;
       color: #fff;
       border-bottom-right-radius: 4px;
     }
 
     .other .bubble {
       background: #e5e7eb;
-      background-color: #e5e7eb;
       color: #111827;
       border-bottom-left-radius: 4px;
     }
@@ -254,43 +264,27 @@
       text-align: right;
     }
 
+    #chatInput {
+      background: white;
+      border: 1px solid #c7d2fe;
+    }
+
+    #sendBtn {
+      background-color: #2563eb;
+      color: white;
+      transition: background 0.2s ease;
+    }
+
+    #sendBtn:hover {
+      background-color: #1e40af;
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(3px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-
-#chatInput {
-  background: white;
-  border: 1px solid #c7d2fe;
-}
-
-#sendBtn {
-  background-color: #2563eb;
-  color: white;
-  transition: background 0.2s ease;
-}
-#sendBtn:hover {
-  background-color: #1e40af;
-}
-    /* --- Buttons --- */
-    #newChatBtn {
-      margin: 0.75rem;
-      padding: 0.5rem;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-    }
-
-    #newChatBtn:hover {
-      background: #1e40af;
-    }
-
-    /* --- Scrollbars --- */
+    /* Scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
     }
@@ -326,16 +320,14 @@
   <!-- Main Chat Pane -->
   <div id="chat-pane">
     <h2 style="margin:0;background:#111827;color:white;padding:0.9rem;text-align:center;border-left:1px solid #1e3a8a;">
-  Lavender Chat Dashboard
-</h2>
+      Lavender Chat Dashboard
+    </h2>
     <div id="chatContent">
       <p style="color:#64748b;">Select or create a conversation to start chatting</p>
     </div>
   </div>
 
+  <!-- Your JS -->
   <script type="module" src="./index.js"></script>
 </body>
 </html>
-
-
-
