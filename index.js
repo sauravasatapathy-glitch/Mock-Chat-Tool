@@ -1,4 +1,5 @@
 // index.js (clean + fixed navRail order)
+import { createIcons, icons } from "https://unpkg.com/lucide@latest/dist/esm/lucide.js";
 import { getUserFromToken, getAuthHeader } from "./authHelper.js";
 import { checkAuth, logout } from "./authGuard.js";
 
@@ -10,6 +11,8 @@ const rightPane = document.getElementById("right-pane");
 const chatContent = document.getElementById("chatContent");
 const newChatBtn = document.getElementById("newChatBtn");
 const navRail = document.getElementById("nav-rail"); // ✅ moved to top, before use
+
+createIcons({ icons });
 
 // AUTH
 const session = checkAuth(["admin", "trainer", "agent"]);
