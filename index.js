@@ -49,11 +49,41 @@ logoutBtn.onclick = () => {
   logout();
 };
 document.body.appendChild(logoutBtn);
+// Agent mode: compact layout
+if (role === "agent") {
+  document.body.classList.add("agent-mode");
+} else {
+  document.body.classList.remove("agent-mode");
+}
+
+// Wire nav clicks
+if (navRail && role !== "agent") {
+  navRail.addEventListener("click", (e) => {
+    const btn = e.target.closest(".nav-item");
+    if (!btn) return;
+    setActiveTab(btn.dataset.tab);
+  });
+}
+
+// Initial tab for trainers/admins
+if (role !== "agent") {
+  setActiveTab("home");   // this calls renderSidePane("home") and then loadConversations()
+  updateHomeBadge();
+}
 
 // Global SSE + seen tracking
 let currentEventSource = null;
 let currentConvKey = null;
 let seenIds = new Set();
+// ---- Nav rail wiring ----
+const navRail = document.getElementById("nav-rail");
+
+function setActiveTab(tab) {
+  document.querySelectorAll("#nav-rail .nav-item").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+  renderSidePane(tab);
+}
 
 // Notification permission request (non-blocking)
 if ("Notification" in window && Notification.permission === "default") {
@@ -75,6 +105,170 @@ function autoScrollMessages() {
     top: container.scrollHeight,
     behavior: "smooth",
   });
+}
+// Render dynamic content inside #left-pane based on tab
+async function renderSidePane(tab) {
+  if (!leftPane) return;
+
+  if (tab === "home") {
+    leftPane.innerHTML = `
+      <h3>Active Conversations</h3>
+      <ul id="activeConversations"></ul>
+    `;
+    // reuse your existing fetch -> loadConversations(); will fill active list
+    await loadConversations();
+    return;
+  }
+
+  if (tab === "archive") {
+    leftPane.innerHTML = `
+      <h3>Archive</h3>
+      <ul id="archiveList"><li style="padding:.6rem;opacity:.7">Loading…</li></ul>
+    `;
+    await renderArchiveList();
+    return;
+  }
+
+  if (tab === "create") {
+    leftPane.innerHTML = `
+      <h3>Create Conversation</h3>
+      <div style="padding:0.75rem; display:flex; flex-direction:column; gap:8px;">
+        <label>Trainer</label>
+        <input id="createTrainer" placeholder="Trainer name" />
+        <label>Associate</label>
+        <input id="createAssociate" placeholder="Associate name" />
+        <button id="createBtn" style="margin-top:8px;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 10px;cursor:pointer;">Create</button>
+        <div id="createNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
+      </div>
+    `;
+    const t = document.getElementById("createTrainer");
+    const a = document.getElementById("createAssociate");
+    const btn = document.getElementById("createBtn");
+    const note = document.getElementById("createNote");
+    t.value = user?.name || "";
+    btn.onclick = async () => {
+      const trainerName = t.value.trim();
+      const associateName = a.value.trim();
+      if (!trainerName || !associateName) { note.textContent = "Both names required."; return; }
+      try {
+        const res = await fetch(`${API_BASE_URL}/conversations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader },
+          body: JSON.stringify({ trainerName, associateName }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to create.");
+        note.textContent = `Created. Key: ${data.convKey}`;
+        // refresh Home list badge
+        await updateHomeBadge();
+        // optional: open now?
+        // openConversation(data.conversation);
+      } catch (e) { note.textContent = e.message; }
+    };
+    return;
+  }
+
+  if (tab === "queue") {
+    leftPane.innerHTML = `
+      <h3>Queue</h3>
+      <ul id="queueList"><li style="padding:.6rem;opacity:.7">Loading…</li></ul>
+    `;
+    await renderQueueList();
+    return;
+  }
+
+  if (tab === "reports") {
+    leftPane.innerHTML = `
+      <h3>Reports</h3>
+      <div style="padding:0.75rem; display:flex; flex-direction:column; gap:8px;">
+        <label>From</label><input type="date" id="rFrom"/>
+        <label>To</label><input type="date" id="rTo"/>
+        <button id="rExport" style="margin-top:8px;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 10px;cursor:pointer;">Export CSV</button>
+        <div id="rNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
+      </div>
+    `;
+    const btn = document.getElementById("rExport");
+    const note = document.getElementById("rNote");
+    btn.onclick = async () => {
+      note.textContent = "Preparing…";
+      try {
+        // placeholder: you’ll implement API later. For now, we can export current myConvs if available.
+        note.textContent = "Coming soon: server-side export.";
+      } catch (e) { note.textContent = e.message; }
+    };
+    return;
+  }
+}
+async function renderArchiveList() {
+  try {
+    const url = `${API_BASE_URL}/conversations?all=true`;
+    const res = await fetch(url, { headers: { ...authHeader } });
+    const rows = await res.json();
+    const list = document.getElementById("archiveList");
+    if (!res.ok) { list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${rows.error || "Failed to load"}</li>`; return; }
+
+    const ended = (rows || []).filter(c => c.ended);
+    if (ended.length === 0) { list.innerHTML = `<li style="padding:.6rem;opacity:.7">No archived conversations</li>`; return; }
+
+    list.innerHTML = "";
+    ended.forEach(c => {
+      const li = document.createElement("li");
+      li.style.padding = ".6rem";
+      li.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
+      li.onclick = () => openConversation(c);
+      list.appendChild(li);
+    });
+  } catch (e) {
+    const list = document.getElementById("archiveList");
+    if (list) list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${e.message}</li>`;
+  }
+}
+
+// Treat "Queue" as conversations with no messages yet (you can adjust this later)
+async function renderQueueList() {
+  try {
+    const url = `${API_BASE_URL}/conversations?all=true`;
+    const res = await fetch(url, { headers: { ...authHeader } });
+    const rows = await res.json();
+    const list = document.getElementById("queueList");
+    if (!res.ok) { list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${rows.error || "Failed to load"}</li>`; return; }
+
+    // Placeholder heuristic: not ended and may have 0 unread_count and (optionally) a flag in DB later
+    const queued = (rows || []).filter(c => !c.ended && (c.msg_count === 0 || c.unread_count === 0)); // adjust when you add msg_count
+    if (queued.length === 0) { list.innerHTML = `<li style="padding:.6rem;opacity:.7">No queued conversations</li>`; return; }
+
+    list.innerHTML = "";
+    queued.forEach(c => {
+      const li = document.createElement("li");
+      li.style.padding = ".6rem";
+      li.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
+      li.onclick = () => openConversation(c);
+      list.appendChild(li);
+    });
+  } catch (e) {
+    const list = document.getElementById("queueList");
+    if (list) list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${e.message}</li>`;
+  }
+}
+async function updateHomeBadge() {
+  try {
+    const badge = document.getElementById("badge-home");
+    if (!badge) return;
+    const url = `${API_BASE_URL}/conversations?all=true`;
+    const res = await fetch(url, { headers: { ...authHeader } });
+    const rows = await res.json();
+    if (!res.ok) { badge.hidden = true; return; }
+    const totalUnread = (rows || []).reduce((sum, c) => sum + (c.unread_count || 0), 0);
+    if (totalUnread > 0) {
+      badge.textContent = totalUnread > 99 ? "99+" : String(totalUnread);
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  } catch {
+    const badge = document.getElementById("badge-home");
+    if (badge) badge.hidden = true;
+  }
 }
 
 // ---------- Load conversations (role-aware) ----------
