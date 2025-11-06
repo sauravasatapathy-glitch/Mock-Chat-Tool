@@ -168,6 +168,63 @@
 .message.other {
   justify-content: flex-start;
 }
+/* Wrapper controls alignment left/right */
+.chat-bubble-wrapper {
+  display: flex;
+  width: 100%;
+}
+
+.chat-bubble-wrapper.self {
+  justify-content: flex-end;
+}
+.chat-bubble-wrapper.other {
+  justify-content: flex-start;
+}
+
+/* Bubble visual styling */
+.chat-bubble {
+  max-width: 92%;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  word-wrap: break-word;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+/* Roles */
+.chat-bubble.self {
+  background: #2563eb;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.other {
+  background: #e2e8f0;
+  color: #111827;
+  border-bottom-left-radius: 4px;
+}
+
+/* Sender label */
+.msg-sender {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Message text */
+.msg-text {
+  white-space: pre-wrap;
+}
+
+/* Timestamp */
+.msg-time {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-top: 0.35rem;
+  text-align: right;
+}
 
 /* visual styles */
 .self .chat-bubble {
@@ -218,6 +275,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
