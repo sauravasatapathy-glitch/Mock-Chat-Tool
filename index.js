@@ -1,4 +1,4 @@
-// index.js (updated - agent auto-open + convKey check)
+// index.js (clean + fixed navRail order)
 import { getUserFromToken, getAuthHeader } from "./authHelper.js";
 import { checkAuth, logout } from "./authGuard.js";
 
@@ -9,6 +9,7 @@ const leftPane = document.getElementById("left-pane");
 const rightPane = document.getElementById("right-pane");
 const chatContent = document.getElementById("chatContent");
 const newChatBtn = document.getElementById("newChatBtn");
+const navRail = document.getElementById("nav-rail"); // ✅ moved to top, before use
 
 // AUTH
 const session = checkAuth(["admin", "trainer", "agent"]);
@@ -25,7 +26,6 @@ if (role === "agent") {
   if (rightPane) rightPane.style.display = "none";
   if (newChatBtn) newChatBtn.style.display = "none";
 } else {
-  // non-agent: wire create conversation
   if (newChatBtn) {
     newChatBtn.addEventListener("click", () => {
       const associate = prompt("Enter associate name:");
@@ -37,26 +37,35 @@ if (role === "agent") {
 // Logout button (always available)
 const logoutBtn = document.createElement("button");
 logoutBtn.textContent = "Logout";
-logoutBtn.style.cssText = "position:fixed;top:10px;right:10px;padding:0.4rem 0.8rem;background:#dc2626;color:white;border:none;border-radius:0.5rem;cursor:pointer;z-index:1000;";
+logoutBtn.style.cssText =
+  "position:fixed;top:10px;right:10px;padding:0.4rem 0.8rem;background:#dc2626;color:white;border:none;border-radius:0.5rem;cursor:pointer;z-index:1000;";
 logoutBtn.onclick = () => {
-  // clear agent-specific keys plus token/user
   try {
     localStorage.removeItem("convKey");
     localStorage.removeItem("trainerName");
     localStorage.removeItem("role");
     localStorage.removeItem("user");
-  } catch(e){}
+  } catch (e) {}
   logout();
 };
 document.body.appendChild(logoutBtn);
-// Agent mode: compact layout
+
+// ===== Layout mode =====
 if (role === "agent") {
   document.body.classList.add("agent-mode");
 } else {
   document.body.classList.remove("agent-mode");
 }
 
-// Wire nav clicks
+// ====== Nav Rail Wiring ======
+function setActiveTab(tab) {
+  document.querySelectorAll("#nav-rail .nav-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+  renderSidePane(tab);
+}
+
+// Wire nav clicks (after navRail exists)
 if (navRail && role !== "agent") {
   navRail.addEventListener("click", (e) => {
     const btn = e.target.closest(".nav-item");
@@ -65,48 +74,36 @@ if (navRail && role !== "agent") {
   });
 }
 
-// Initial tab for trainers/admins
+// Initial tab
 if (role !== "agent") {
-  setActiveTab("home");   // this calls renderSidePane("home") and then loadConversations()
+  setActiveTab("home");
   updateHomeBadge();
 }
 
-// Global SSE + seen tracking
+// ====== Global vars ======
 let currentEventSource = null;
 let currentConvKey = null;
 let seenIds = new Set();
-// ---- Nav rail wiring ----
-const navRail = document.getElementById("nav-rail");
 
-function setActiveTab(tab) {
-  document.querySelectorAll("#nav-rail .nav-item").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.tab === tab);
-  });
-  renderSidePane(tab);
-}
-
-// Notification permission request (non-blocking)
+// Notification permission request
 if ("Notification" in window && Notification.permission === "default") {
   Notification.requestPermission().catch(() => {});
 }
 
-// tiny beep
+// Tiny beep
 const notifAudio = (() => {
   const a = new Audio();
-  a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA";
+  a.src =
+    "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA";
   return a;
 })();
-function playNotification() { try { notifAudio.play().catch(()=>{}); } catch(e){} }
-function autoScrollMessages() {
-  const container = document.getElementById("messages");
-  if (!container) return;
-
-  container.scrollTo({
-    top: container.scrollHeight,
-    behavior: "smooth",
-  });
+function playNotification() {
+  try {
+    notifAudio.play().catch(() => {});
+  } catch (e) {}
 }
-// Render dynamic content inside #left-pane based on tab
+
+// ========= Dynamic Side Pane =========
 async function renderSidePane(tab) {
   if (!leftPane) return;
 
@@ -115,7 +112,6 @@ async function renderSidePane(tab) {
       <h3>Active Conversations</h3>
       <ul id="activeConversations"></ul>
     `;
-    // reuse your existing fetch -> loadConversations(); will fill active list
     await loadConversations();
     return;
   }
@@ -149,7 +145,10 @@ async function renderSidePane(tab) {
     btn.onclick = async () => {
       const trainerName = t.value.trim();
       const associateName = a.value.trim();
-      if (!trainerName || !associateName) { note.textContent = "Both names required."; return; }
+      if (!trainerName || !associateName) {
+        note.textContent = "Both names required.";
+        return;
+      }
       try {
         const res = await fetch(`${API_BASE_URL}/conversations`, {
           method: "POST",
@@ -159,11 +158,10 @@ async function renderSidePane(tab) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to create.");
         note.textContent = `Created. Key: ${data.convKey}`;
-        // refresh Home list badge
         await updateHomeBadge();
-        // optional: open now?
-        // openConversation(data.conversation);
-      } catch (e) { note.textContent = e.message; }
+      } catch (e) {
+        note.textContent = e.message;
+      }
     };
     return;
   }
@@ -191,74 +189,79 @@ async function renderSidePane(tab) {
     const note = document.getElementById("rNote");
     btn.onclick = async () => {
       note.textContent = "Preparing…";
-      try {
-        // placeholder: you’ll implement API later. For now, we can export current myConvs if available.
-        note.textContent = "Coming soon: server-side export.";
-      } catch (e) { note.textContent = e.message; }
+      note.textContent = "Coming soon: server-side export.";
     };
     return;
   }
 }
+
+// ========= Archive + Queue + Badge =========
 async function renderArchiveList() {
   try {
-    const url = `${API_BASE_URL}/conversations?all=true`;
-    const res = await fetch(url, { headers: { ...authHeader } });
+    const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
+      headers: { ...authHeader },
+    });
     const rows = await res.json();
     const list = document.getElementById("archiveList");
-    if (!res.ok) { list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${rows.error || "Failed to load"}</li>`; return; }
-
-    const ended = (rows || []).filter(c => c.ended);
-    if (ended.length === 0) { list.innerHTML = `<li style="padding:.6rem;opacity:.7">No archived conversations</li>`; return; }
-
-    list.innerHTML = "";
-    ended.forEach(c => {
+    if (!res.ok) throw new Error(rows.error || "Failed to load");
+    const ended = (rows || []).filter((c) => c.ended);
+    list.innerHTML =
+      ended.length === 0
+        ? `<li style="opacity:.7;padding:.6rem;">No archived</li>`
+        : "";
+    ended.forEach((c) => {
       const li = document.createElement("li");
-      li.style.padding = ".6rem";
       li.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
+      li.style.padding = ".6rem";
       li.onclick = () => openConversation(c);
       list.appendChild(li);
     });
   } catch (e) {
     const list = document.getElementById("archiveList");
-    if (list) list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${e.message}</li>`;
+    if (list)
+      list.innerHTML = `<li style="color:#b91c1c;padding:.6rem;">${e.message}</li>`;
   }
 }
 
-// Treat "Queue" as conversations with no messages yet (you can adjust this later)
 async function renderQueueList() {
   try {
-    const url = `${API_BASE_URL}/conversations?all=true`;
-    const res = await fetch(url, { headers: { ...authHeader } });
+    const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
+      headers: { ...authHeader },
+    });
     const rows = await res.json();
     const list = document.getElementById("queueList");
-    if (!res.ok) { list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${rows.error || "Failed to load"}</li>`; return; }
-
-    // Placeholder heuristic: not ended and may have 0 unread_count and (optionally) a flag in DB later
-    const queued = (rows || []).filter(c => !c.ended && (c.msg_count === 0 || c.unread_count === 0)); // adjust when you add msg_count
-    if (queued.length === 0) { list.innerHTML = `<li style="padding:.6rem;opacity:.7">No queued conversations</li>`; return; }
-
-    list.innerHTML = "";
-    queued.forEach(c => {
+    if (!res.ok) throw new Error(rows.error || "Failed to load");
+    const queued = (rows || []).filter((c) => !c.ended && (c.msg_count === 0 || c.unread_count === 0));
+    list.innerHTML =
+      queued.length === 0
+        ? `<li style="opacity:.7;padding:.6rem;">No queued conversations</li>`
+        : "";
+    queued.forEach((c) => {
       const li = document.createElement("li");
-      li.style.padding = ".6rem";
       li.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
+      li.style.padding = ".6rem";
       li.onclick = () => openConversation(c);
       list.appendChild(li);
     });
   } catch (e) {
     const list = document.getElementById("queueList");
-    if (list) list.innerHTML = `<li style="padding:.6rem;color:#b91c1c">${e.message}</li>`;
+    if (list)
+      list.innerHTML = `<li style="color:#b91c1c;padding:.6rem;">${e.message}</li>`;
   }
 }
+
 async function updateHomeBadge() {
   try {
     const badge = document.getElementById("badge-home");
     if (!badge) return;
-    const url = `${API_BASE_URL}/conversations?all=true`;
-    const res = await fetch(url, { headers: { ...authHeader } });
+    const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
+      headers: { ...authHeader },
+    });
     const rows = await res.json();
-    if (!res.ok) { badge.hidden = true; return; }
-    const totalUnread = (rows || []).reduce((sum, c) => sum + (c.unread_count || 0), 0);
+    const totalUnread = (rows || []).reduce(
+      (sum, c) => sum + (c.unread_count || 0),
+      0
+    );
     if (totalUnread > 0) {
       badge.textContent = totalUnread > 99 ? "99+" : String(totalUnread);
       badge.hidden = false;
@@ -270,6 +273,7 @@ async function updateHomeBadge() {
     if (badge) badge.hidden = true;
   }
 }
+
 
 // ---------- Load conversations (role-aware) ----------
 async function loadConversations() {
