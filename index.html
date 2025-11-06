@@ -172,14 +172,99 @@
 @media (max-width: 768px) {
   .bubble { max-width: 92%; font-size: 0.94rem; }
 }
+/* === Slack-style vertical nav rail === */
+#nav-rail {
+  width: 68px;
+  background: #0f172a; /* slate-950 */
+  color: #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+  border-right: 1px solid #1e293b;
+}
 
+#nav-rail .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 10px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+#nav-rail .nav-item:hover { background: #111827; transform: translateY(-1px); }
+#nav-rail .nav-item.active { background: #1f2937; color: #ffffff; }
 
+#nav-rail .icon { font-size: 18px; line-height: 1; }
+#nav-rail .label { font-size: 10px; opacity: .9; }
 
+#nav-rail .badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Layout tweak to fit rail on the left */
+body { display: grid; grid-template-columns: 68px 20% 1fr 20%; grid-template-rows: 100vh; }
+#nav-rail { grid-column: 1; }
+#left-pane { grid-column: 2; }
+#chat-pane { grid-column: 3; }
+#right-pane { grid-column: 4; }
+
+/* Agents: the JS already hides side panes; we also collapse rail via a class toggle */
+body.agent-mode {
+  grid-template-columns: 0px 0 1fr 0;
+}
+body.agent-mode #nav-rail,
+body.agent-mode #left-pane,
+body.agent-mode #right-pane { display: none; }
 
   </style>
 </head>
 
 <body>
+  <!-- Slack-style Nav Rail -->
+<nav id="nav-rail" aria-label="Primary">
+  <button class="nav-item active" data-tab="home" title="Home">
+    <span class="icon">🏠</span>
+    <span class="label">Home</span>
+    <span class="badge" id="badge-home" hidden>0</span>
+  </button>
+  <button class="nav-item" data-tab="archive" title="Archive">
+    <span class="icon">📦</span>
+    <span class="label">Archive</span>
+  </button>
+  <button class="nav-item" data-tab="create" title="Create">
+    <span class="icon">➕</span>
+    <span class="label">Create</span>
+  </button>
+  <button class="nav-item" data-tab="queue" title="Queue">
+    <span class="icon">🕓</span>
+    <span class="label">Queue</span>
+  </button>
+  <button class="nav-item" data-tab="reports" title="Reports">
+    <span class="icon">📊</span>
+    <span class="label">Reports</span>
+  </button>
+</nav>
+
   <!-- Left Pane -->
   <div id="left-pane">
     <h3>Active Conversations</h3>
@@ -204,6 +289,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
