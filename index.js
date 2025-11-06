@@ -343,18 +343,37 @@ async function sendMessage(convKey, senderName, senderRole, text) {
 }
 
 // ---------- Render message ----------
-function renderMessages(msgs) {
-  const container = document.getElementById("messages");
-  container.innerHTML = "";
+function renderMessage(container, msg, opts = { scroll: true }) {
+  const sender = msg.sender_name || msg.senderName || msg.sender || "Unknown";
+  const senderRole = msg.role || msg.senderRole || "unknown";
+  const isSelf = (sender === user.name) && (senderRole === role);
 
-  msgs.forEach((m) => {
-    const bubble = document.createElement("div");
-    bubble.className = `chat-bubble ${m.sender === userRole ? "self" : "other"}`;
-    bubble.textContent = m.text;
-    container.appendChild(bubble);
-  });
+  const wrapper = document.createElement("div");
+  wrapper.className = `chat-bubble-wrapper ${isSelf ? "self" : "other"}`;
+  if (msg.id) wrapper.dataset.id = msg.id;
 
-  autoScrollMessages();
+  const bubble = document.createElement("div");
+  bubble.className = `chat-bubble ${isSelf ? "self" : "other"}`;
+
+  // ✅ Only show sender name if NOT self
+  const senderLabel = !isSelf ? `<strong class="msg-sender">${escapeHtml(sender)}</strong>` : "";
+
+  bubble.innerHTML = `
+    ${senderLabel}
+    <div class="msg-text">${escapeHtml(msg.text || "")}</div>
+    <div class="msg-time">${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+  `;
+
+  wrapper.appendChild(bubble);
+  container.appendChild(wrapper);
+
+  // ✅ Smooth scroll to bottom
+  if (opts.scroll) {
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth"
+    });
+  }
 }
 
 
