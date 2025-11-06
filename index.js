@@ -34,21 +34,19 @@ if (role === "agent") {
   }
 }
 
-// Logout button (always available)
-const logoutBtn = document.createElement("button");
-logoutBtn.textContent = "Logout";
-logoutBtn.style.cssText =
-  "position:fixed;top:10px;right:10px;padding:0.4rem 0.8rem;background:#dc2626;color:white;border:none;border-radius:0.5rem;cursor:pointer;z-index:1000;";
-logoutBtn.onclick = () => {
-  try {
-    localStorage.removeItem("convKey");
-    localStorage.removeItem("trainerName");
-    localStorage.removeItem("role");
-    localStorage.removeItem("user");
-  } catch (e) {}
-  logout();
-};
-document.body.appendChild(logoutBtn);
+// Logout button
+const logoutBtn = document.getElementById("logoutBtn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", () => {
+    try {
+      localStorage.removeItem("convKey");
+      localStorage.removeItem("trainerName");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user");
+    } catch (e) {}
+    logout();
+  });
+}
 
 // ===== Layout mode =====
 if (role === "agent") {
@@ -64,6 +62,7 @@ function setActiveTab(tab) {
   });
   renderSidePane(tab);
 }
+if (window.createIcons) window.createIcons();
 
 // Wire nav clicks (after navRail exists)
 if (navRail && role !== "agent") {
