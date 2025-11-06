@@ -348,26 +348,35 @@ function renderMessage(container, msg, opts = { scroll: true }) {
   const senderRole = msg.role || msg.senderRole || "unknown";
   const isSelf = (sender === user.name) && (senderRole === role);
 
+  // wrapper that controls alignment
   const wrapper = document.createElement("div");
   wrapper.className = `message ${isSelf ? "self" : "other"}`;
   if (msg.id) wrapper.dataset.id = msg.id;
 
+  // bubble that sizes to content
   const bubble = document.createElement("div");
   bubble.className = "bubble";
+
+  // only show sender label for non-self (optional)
+  const senderHtml = !isSelf ? `<span class="sender">${escapeHtml(sender)}</span>` : "";
+
+  const timeStr = new Date(msg.timestamp || Date.now())
+    .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
   bubble.innerHTML = `
-    <span class="sender">${escapeHtml(sender)}</span>
-    <div>${escapeHtml(msg.text || "")}</div>
-    <span class="timestamp">
-      ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-    </span>
+    ${senderHtml}
+    <div class="msg-text">${escapeHtml(msg.text || "")}</div>
+    <span class="timestamp">${timeStr}</span>
   `;
 
   wrapper.appendChild(bubble);
   container.appendChild(wrapper);
-  if (opts.scroll) container.scrollTop = container.scrollHeight;
+
+  // auto-scroll (smooth)
+  if (opts.scroll) {
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+  }
 }
-
-
 
 // escape
 function escapeHtml(s) {
