@@ -12,6 +12,7 @@ const chatContent = document.getElementById("chatContent");
 const newChatBtn = document.getElementById("newChatBtn");
 const navRail = document.getElementById("nav-rail"); // ✅ moved to top, before use
 
+window.lucide = { createIcons, icons };
 createIcons({ icons });
 
 // AUTH
@@ -73,7 +74,7 @@ if (navRail && role !== "agent") {
     if (!btn) return;
     setActiveTab(btn.dataset.tab);
     // Reinitialize Lucide icons after DOM load
-    if (window.createIcons) window.createIcons();
+    if (window.lucide) window.lucide.createIcons({ icons: window.lucide.icons });
 
   });
 }
@@ -82,7 +83,7 @@ if (navRail && role !== "agent") {
 if (role !== "agent") {
   setActiveTab("home");
   // Reinitialize Lucide icons after DOM load
-  if (window.createIcons) window.createIcons();
+  if (window.lucide) window.lucide.createIcons({ icons: window.lucide.icons });
 
   updateHomeBadge();
 }
