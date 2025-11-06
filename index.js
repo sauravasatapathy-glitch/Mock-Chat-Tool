@@ -62,7 +62,6 @@ function setActiveTab(tab) {
   });
   renderSidePane(tab);
 }
-if (window.createIcons) window.createIcons();
 
 // Wire nav clicks (after navRail exists)
 if (navRail && role !== "agent") {
@@ -70,12 +69,18 @@ if (navRail && role !== "agent") {
     const btn = e.target.closest(".nav-item");
     if (!btn) return;
     setActiveTab(btn.dataset.tab);
+    // Reinitialize Lucide icons after DOM load
+    if (window.createIcons) window.createIcons();
+
   });
 }
 
 // Initial tab
 if (role !== "agent") {
   setActiveTab("home");
+  // Reinitialize Lucide icons after DOM load
+  if (window.createIcons) window.createIcons();
+
   updateHomeBadge();
 }
 
