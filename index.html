@@ -93,69 +93,40 @@
       background: #e0ecff;
     }
 
-    /* === Chat Content === */
-    #chatContent {
-      flex: 1;
-      border: 1px solid #e2e8f0;
-      border-radius: 0.5rem;
-      background: #fff;
-      margin-top: 1rem;
-      padding: 1rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-    }
+    /* ====== Chat container & layout ====== */
+#chatContent {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #fff;
+  margin-top: 1rem;
+  padding: 1rem;
+  overflow: hidden;             /* outer container controls overflow */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;         /* <- IMPORTANT: allow messages to use top-to-bottom flow */
+  justify-content: flex-start;  /* <- IMPORTANT: start content from top */
+  text-align: left;
+}
 
-    /* === Buttons === */
-    #newChatBtn {
-      margin: 0.75rem;
-      padding: 0.5rem;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-    }
-
-    #newChatBtn:hover {
-      background: #1e40af;
-    }
-
-    /* === Scrollbars === */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 3px;
-    }
-/* === CHAT MESSAGES === */
-/* ────────────────────────────────────────────────
-   CHAT CONTAINER
-────────────────────────────────────────────────── */
+/* messages list (inner pane that scrolls) */
 #messages {
-  height: calc(100vh - 160px);
+  flex: 1;                      /* fill available vertical space */
   overflow-y: auto;
   padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
   scroll-behavior: smooth;
-  background: #f9fafb;
+  background: transparent;
 }
 
-/* ────────────────────────────────────────────────
-   MESSAGE WRAPPER (ALIGNMENT)
-────────────────────────────────────────────────── */
+/* wrapper controls alignment left/right and prevents stretching */
 .message {
   display: flex;
   width: 100%;
+  align-items: flex-start;      /* <- prevent children from stretching vertically */
+  /* do not set height here */
 }
 .message.self {
   justify-content: flex-end;
@@ -164,78 +135,44 @@
   justify-content: flex-start;
 }
 
-/* ────────────────────────────────────────────────
-   BUBBLE BASE STYLE
-────────────────────────────────────────────────── */
+/* bubble: inline-flex so it sizes to content and doesn't stretch */
 .bubble {
-  display: inline-block;
-  width: max-content;
-  padding: 0.65rem 0.9rem;
-  max-width: 70%;
-  border-radius: 14px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: auto;
+  max-width: 85%;               /* keep readable line length */
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
   font-size: 0.95rem;
-  line-height: 1.4;
-  position: relative;
+  line-height: 1.35;
   word-wrap: break-word;
   white-space: pre-wrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
-/* ────────────────────────────────────────────────
-   SELF / OTHER COLORS
-────────────────────────────────────────────────── */
+/* role colors + ensure bubble won't stretch vertically */
 .message.self .bubble {
   background: #2563eb;
   color: #fff;
+  margin-left: auto;            /* force right side */
 }
 .message.other .bubble {
-  background: #e5e7eb;
-  color: #111827;
+  background: #eef1f5;
+  color: #1e293b;
+  margin-right: auto;
 }
 
-/* ────────────────────────────────────────────────
-   SENDER NAME
-────────────────────────────────────────────────── */
-.bubble .sender {
-  font-size: 0.8rem;
-  font-weight: 600;
-  opacity: 0.85;
-  margin-bottom: 0.25rem;
-  display: block;
+/* sender & timestamp */
+.bubble .sender { font-size: 0.82rem; font-weight:600; margin-bottom:6px; opacity:0.85; }
+.bubble .msg-text { display:block; }
+.bubble .timestamp { font-size:0.72rem; opacity:0.6; margin-top:8px; align-self:flex-end; }
+
+/* responsiveness */
+@media (max-width: 768px) {
+  .bubble { max-width: 92%; font-size: 0.94rem; }
 }
 
-/* ────────────────────────────────────────────────
-   TIMESTAMP
-────────────────────────────────────────────────── */
-.bubble .timestamp {
-  font-size: 0.72rem;
-  opacity: 0.55;
-  margin-top: 0.4rem;
-  display: block;
-  text-align: right;
-}
-
-/* ────────────────────────────────────────────────
-   OPTIONAL: TAILS (DISABLED BY DEFAULT)
-────────────────────────────────────────────────── */
-
-.message.self .bubble::after,
-.message.other .bubble::after {
-  content: "";
-  position: absolute;
-  bottom: 0.35rem;
-  width: 0;
-  height: 0;
-  border: 8px solid transparent;
-}
-.message.self .bubble::after {
-  right: -6px;
-  border-left-color: #2563eb;
-}
-.message.other .bubble::after {
-  left: -6px;
-  border-right-color: #e5e7eb;
-}
 
 
 
@@ -267,6 +204,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
