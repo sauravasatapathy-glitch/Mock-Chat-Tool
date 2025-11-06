@@ -5,236 +5,274 @@
   <title>Mock Chat Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: system-ui, sans-serif;
-      margin: 0;
-      background: #f8fafc;
-      display: flex;
-      height: 100vh;
-      color: #1e293b;
-    }
-@keyframes bounceIn {
-  0% { transform: scale(0.9); opacity: 0.6; }
-  60% { transform: scale(1.05); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-/* Conversation badge */
-.conv-badge {
-  min-width: 26px;
-  height: 26px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:999px;
-  background:#2563eb;
-  color:white;
-  font-weight:700;
-  padding:0 8px;
-  font-size:0.85rem;
+   /* === Base === */
+* {
+  box-sizing: border-box;
 }
 
-/* Conversation li bold when unread (we set inline style too) */
-#myConversations li strong,
-#activeConversations li strong { font-weight: 600; }
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  background: #f8fafc;
+  color: #1e293b;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
 
-    /* === Panes === */
-    #left-pane, #right-pane {
-      width: 20%;
-      background: #fff;
-      border-right: 1px solid #e2e8f0;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-    }
+/* === Sidebar (Slack-style vertical nav rail) === */
+#nav-rail {
+  width: 70px;
+  background: #1e40af;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1rem;
+  gap: 1.5rem;
+  color: #fff;
+  border-right: 1px solid #1e3a8a;
+}
 
-    #right-pane {
-      border-right: none;
-      border-left: 1px solid #e2e8f0;
-    }
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  position: relative;
+}
 
-    #chat-pane {
-      flex: 1;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+.nav-item:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
 
-    /* === Headers === */
-    h2, h3 {
-      margin: 0;
-      background: #2563eb;
-      color: white;
-      padding: 0.75rem;
-      text-align: center;
-    }
+.nav-item.active {
+  opacity: 1;
+  font-weight: 600;
+  color: #fff;
+}
 
-    /* === Lists === */
-    ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      flex: 1;
-      overflow-y: auto;
-    }
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 24px;
+  background: #60a5fa;
+  border-radius: 4px;
+}
 
-    li {
-      padding: 0.6rem;
-      cursor: pointer;
-      border-bottom: 1px solid #f1f5f9;
-      transition: background 0.2s ease;
-    }
+/* Nav badge (e.g., unread count) */
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ef4444;
+  color: white;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  min-width: 18px;
+  text-align: center;
+}
 
-    li:hover {
-      background: #e0ecff;
-    }
+/* === Layout === */
+#left-pane,
+#right-pane {
+  width: 22%;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+}
 
-    /* ====== Chat container & layout ====== */
+#right-pane {
+  border-left: 1px solid #e2e8f0;
+  border-right: none;
+}
+
+#chat-pane {
+  flex: 1;
+  min-width: 0; /* prevents overflow */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+h2,
+h3 {
+  margin: 0;
+  background: #2563eb;
+  color: white;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+/* === Lists === */
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+li {
+  padding: 0.6rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s ease;
+}
+
+li:hover {
+  background: #e0ecff;
+}
+
+/* === Chat Area === */
 #chatContent {
   flex: 1;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  background: #fff;
   margin-top: 1rem;
-  padding: 1rem;
-  overflow: hidden;             /* outer container controls overflow */
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  align-items: stretch;         /* <- IMPORTANT: allow messages to use top-to-bottom flow */
-  justify-content: flex-start;  /* <- IMPORTANT: start content from top */
-  text-align: left;
+  overflow: hidden;
 }
 
-/* messages list (inner pane that scrolls) */
+#chatContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
 #messages {
-  flex: 1;                      /* fill available vertical space */
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  scroll-behavior: smooth;
-  background: transparent;
+  gap: 0.4rem;
+  background: white;
 }
 
-/* wrapper controls alignment left/right and prevents stretching */
+/* === Message Bubbles === */
 .message {
   display: flex;
   width: 100%;
-  align-items: flex-start;      /* <- prevent children from stretching vertically */
-  /* do not set height here */
 }
+
 .message.self {
   justify-content: flex-end;
 }
+
 .message.other {
   justify-content: flex-start;
 }
 
-/* bubble: inline-flex so it sizes to content and doesn't stretch */
 .bubble {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: auto;
-  max-width: 85%;               /* keep readable line length */
-  padding: 0.6rem 0.9rem;
-  border-radius: 12px;
+  padding: 0.65rem 1rem;
+  border-radius: 14px;
+  line-height: 1.4;
   font-size: 0.95rem;
-  line-height: 1.35;
+  max-width: 80%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   word-wrap: break-word;
-  white-space: pre-wrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
-/* role colors + ensure bubble won't stretch vertically */
 .message.self .bubble {
   background: #2563eb;
-  color: #fff;
-  margin-left: auto;            /* force right side */
+  color: white;
+  border-bottom-right-radius: 5px;
 }
+
 .message.other .bubble {
-  background: #eef1f5;
-  color: #1e293b;
-  margin-right: auto;
+  background: #e5e7eb;
+  color: #111827;
+  border-bottom-left-radius: 5px;
 }
 
-/* sender & timestamp */
-.bubble .sender { font-size: 0.82rem; font-weight:600; margin-bottom:6px; opacity:0.85; }
-.bubble .msg-text { display:block; }
-.bubble .timestamp { font-size:0.72rem; opacity:0.6; margin-top:8px; align-self:flex-end; }
-
-/* responsiveness */
-@media (max-width: 768px) {
-  .bubble { max-width: 92%; font-size: 0.94rem; }
+.sender {
+  display: block;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin-bottom: 3px;
 }
-/* === Slack-style vertical nav rail === */
-#nav-rail {
-  width: 68px;
-  background: #0f172a; /* slate-950 */
-  color: #cbd5e1;
+
+.timestamp {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-top: 0.25rem;
+  display: block;
+  text-align: right;
+}
+
+/* === Chat Input === */
+#chatInputArea {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 8px;
-  border-right: 1px solid #1e293b;
-}
-
-#nav-rail .nav-item {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 0.5rem;
+}
+
+#chatInput {
+  flex: 1;
+  resize: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+
+#sendBtn {
+  background: #2563eb;
+  color: white;
   border: none;
-  background: transparent;
-  color: inherit;
-  padding: 10px 6px;
-  border-radius: 10px;
+  border-radius: 0.5rem;
+  padding: 0.6rem 1.2rem;
   cursor: pointer;
-  position: relative;
-  transition: background 0.15s ease, transform 0.06s ease;
-}
-#nav-rail .nav-item:hover { background: #111827; transform: translateY(-1px); }
-#nav-rail .nav-item.active { background: #1f2937; color: #ffffff; }
-
-#nav-rail .icon { font-size: 18px; line-height: 1; }
-#nav-rail .label { font-size: 10px; opacity: .9; }
-
-#nav-rail .badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  transition: background 0.2s ease;
 }
 
-/* Layout tweak to fit rail on the left */
-body { display: grid; grid-template-columns: 68px 20% 1fr 20%; grid-template-rows: 100vh; }
-#nav-rail { grid-column: 1; }
-#left-pane { grid-column: 2; }
-#chat-pane { grid-column: 3; }
-#right-pane { grid-column: 4; }
-
-/* Agents: the JS already hides side panes; we also collapse rail via a class toggle */
-body.agent-mode {
-  grid-template-columns: 0px 0 1fr 0;
+#sendBtn:hover {
+  background: #1e3a8a;
 }
-body.agent-mode #nav-rail,
-body.agent-mode #left-pane,
-body.agent-mode #right-pane { display: none; }
+
+/* === Scrollbars === */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* === Responsive === */
+@media (max-width: 900px) {
+  #left-pane, #right-pane {
+    display: none;
+  }
+  #nav-rail {
+    width: 60px;
+  }
+  .bubble {
+    max-width: 90%;
+  }
+}
 
   </style>
 </head>
@@ -289,6 +327,7 @@ body.agent-mode #right-pane { display: none; }
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
