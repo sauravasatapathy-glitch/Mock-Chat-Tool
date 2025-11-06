@@ -67,6 +67,15 @@ const notifAudio = (() => {
   return a;
 })();
 function playNotification() { try { notifAudio.play().catch(()=>{}); } catch(e){} }
+function autoScrollMessages() {
+  const container = document.getElementById("messages");
+  if (!container) return;
+
+  container.scrollTo({
+    top: container.scrollHeight,
+    behavior: "smooth",
+  });
+}
 
 // ---------- Load conversations (role-aware) ----------
 async function loadConversations() {
@@ -334,34 +343,20 @@ async function sendMessage(convKey, senderName, senderRole, text) {
 }
 
 // ---------- Render message ----------
-function renderMessage(container, msg, opts = { scroll: true }) {
-  const sender = msg.sender_name || msg.senderName || msg.sender || "Unknown";
-  const senderRole = msg.role || msg.senderRole || "unknown";
-  const isSelf = (sender === user.name) && (senderRole === role);
+function renderMessages(msgs) {
+  const container = document.getElementById("messages");
+  container.innerHTML = "";
 
-  const wrapper = document.createElement("div");
-  wrapper.className = `message ${isSelf ? "self" : "other"}`;
-  wrapper.style.display = "flex";
-  wrapper.style.justifyContent = isSelf ? "flex-end" : "flex-start";
-  if (msg.id) wrapper.dataset.id = msg.id;
+  msgs.forEach((m) => {
+    const bubble = document.createElement("div");
+    bubble.className = `chat-bubble ${m.sender === userRole ? "self" : "other"}`;
+    bubble.textContent = m.text;
+    container.appendChild(bubble);
+  });
 
-  const bubble = document.createElement("div");
-  bubble.style.background = isSelf ? "#2563eb" : "#e2e8f0";
-  bubble.style.color = isSelf ? "#fff" : "#111827";
-  bubble.style.padding = "0.6rem 0.9rem";
-  bubble.style.borderRadius = "12px";
-  bubble.style.maxWidth = "72%";
-  bubble.style.boxShadow = "0 1px 2px rgba(0,0,0,0.06)";
-  bubble.innerHTML = `<strong style="font-size:0.85rem;opacity:0.85">${escapeHtml(sender)}</strong>
-    <div style="margin-top:0.25rem;white-space:pre-wrap;">${escapeHtml(msg.text || "")}</div>
-    <div style="font-size:0.7rem;opacity:0.65;margin-top:0.35rem;text-align:${isSelf ? "right" : "left"}">
-      ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
-    </div>`;
-
-  wrapper.appendChild(bubble);
-  container.appendChild(wrapper);
-  if (opts.scroll) container.scrollTop = container.scrollHeight;
+  autoScrollMessages();
 }
+
 
 // escape
 function escapeHtml(s) {
