@@ -16,6 +16,7 @@ let isAgentMode = false;
 // Prevent logged-in users from accessing login page
 const existingUser = localStorage.getItem("user");
 if (existingUser) {
+  // If role exists and is agent/trainer/admin, go to index
   window.location.href = "index.html";
 }
 
@@ -36,16 +37,21 @@ toggleMode.addEventListener("click", () => {
   }
 });
 
+// Small helper to show error
+function showError(msg) {
+  errorDiv.textContent = msg || "";
+}
+
 // === Handle Login ===
 loginBtn.addEventListener("click", async () => {
-  errorDiv.textContent = "";
+  showError("");
 
   try {
     if (isAgentMode) {
       // 🔹 Agent login (no password) - fetch associate name from backend
       const convKey = convKeyInput.value.trim();
       if (!convKey) {
-        errorDiv.textContent = "Conversation Key required.";
+        showError("Conversation Key required.");
         return;
       }
 
@@ -57,17 +63,19 @@ loginBtn.addEventListener("click", async () => {
 
       const data = await resp.json();
       if (!resp.ok) {
-        errorDiv.textContent = data.error || "Invalid conversation key";
+        showError(data.error || "Invalid conversation key");
         return;
       }
 
       // store in same shape your app expects
+      // keep token absent for agent; authGuard should allow agent based on localStorage role/user
       localStorage.setItem("role", "agent");
       localStorage.setItem("convKey", data.convKey);
-      localStorage.setItem("user", JSON.stringify({ name: data.agentName }));
-      // we also store trainerName if you want to show it on UI quick
+      // data.agentName should be the associate name — fallback to empty name if backend not providing
+      localStorage.setItem("user", JSON.stringify({ name: data.agentName || data.associateName || "Agent" }));
       if (data.trainerName) localStorage.setItem("trainerName", data.trainerName);
 
+      // redirect to dashboard
       window.location.href = "index.html";
       return;
     }
@@ -76,7 +84,7 @@ loginBtn.addEventListener("click", async () => {
     const email = emailInput.value.trim();
     const password = passwordInput.value.trim();
     if (!email || !password) {
-      errorDiv.textContent = "Please enter email and password.";
+      showError("Please enter email and password.");
       return;
     }
 
@@ -90,7 +98,7 @@ loginBtn.addEventListener("click", async () => {
     const data = await response.json();
 
     if (!response.ok) {
-      errorDiv.textContent = data.error || "Login failed.";
+      showError(data.error || "Login failed.");
       return;
     }
 
@@ -103,6 +111,6 @@ loginBtn.addEventListener("click", async () => {
     window.location.href = "index.html";
   } catch (err) {
     console.error("Login error:", err);
-    errorDiv.textContent = "Failed to fetch. Please try again.";
+    showError("Failed to fetch. Please try again.");
   }
 });
