@@ -136,116 +136,106 @@
       border-radius: 3px;
     }
 /* === CHAT MESSAGES === */
+/* ────────────────────────────────────────────────
+   CHAT CONTAINER
+────────────────────────────────────────────────── */
 #messages {
+  height: calc(100vh - 160px);
+  overflow-y: auto;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 1rem;
-  overflow-y: auto;
+  gap: 0.65rem;
+  scroll-behavior: smooth;
+  background: #f9fafb;
 }
 
+/* ────────────────────────────────────────────────
+   MESSAGE WRAPPER (ALIGNMENT)
+────────────────────────────────────────────────── */
 .message {
   display: flex;
   width: 100%;
 }
-
-.chat-bubble {
-  max-width: 92%;
-  width: fit-content;
-  padding: 0.65rem 1rem;
-  border-radius: 14px;
-  line-height: 1.4;
-  word-wrap: break-word;
-  font-size: 0.95rem;
-  animation: bounceIn 0.15s ease;
-}
-
-/* agent/trainer alignment */
 .message.self {
   justify-content: flex-end;
 }
-
 .message.other {
   justify-content: flex-start;
 }
-/* Wrapper controls alignment left/right */
-.chat-bubble-wrapper {
-  display: flex;
-  width: 100%;
-}
 
-.chat-bubble-wrapper.self {
-  justify-content: flex-end;
-}
-.chat-bubble-wrapper.other {
-  justify-content: flex-start;
-}
-
-/* Bubble visual styling */
-.chat-bubble {
-  max-width: 92%;
-  padding: 0.6rem 0.9rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-  word-wrap: break-word;
-  line-height: 1.45;
+/* ────────────────────────────────────────────────
+   BUBBLE BASE STYLE
+────────────────────────────────────────────────── */
+.bubble {
+  padding: 0.65rem 0.9rem;
+  max-width: 70%;
+  border-radius: 14px;
   font-size: 0.95rem;
-}
-
-/* Roles */
-.chat-bubble.self {
-  background: #2563eb;
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-
-.chat-bubble.other {
-  background: #e2e8f0;
-  color: #111827;
-  border-bottom-left-radius: 4px;
-}
-
-/* Sender label */
-.msg-sender {
-  font-size: 0.8rem;
-  opacity: 0.75;
-  display: block;
-  margin-bottom: 2px;
-}
-
-/* Message text */
-.msg-text {
+  line-height: 1.4;
+  position: relative;
+  word-wrap: break-word;
   white-space: pre-wrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-/* Timestamp */
-.msg-time {
-  font-size: 0.7rem;
-  opacity: 0.6;
-  margin-top: 0.35rem;
+/* ────────────────────────────────────────────────
+   SELF / OTHER COLORS
+────────────────────────────────────────────────── */
+.message.self .bubble {
+  background: #2563eb;
+  color: #fff;
+}
+.message.other .bubble {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+/* ────────────────────────────────────────────────
+   SENDER NAME
+────────────────────────────────────────────────── */
+.bubble .sender {
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+/* ────────────────────────────────────────────────
+   TIMESTAMP
+────────────────────────────────────────────────── */
+.bubble .timestamp {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  margin-top: 0.4rem;
+  display: block;
   text-align: right;
 }
 
-/* visual styles */
-.self .chat-bubble {
-  background: #2563eb;
-  color: #fff;
-  border-bottom-right-radius: 4px;
+/* ────────────────────────────────────────────────
+   OPTIONAL: TAILS (DISABLED BY DEFAULT)
+────────────────────────────────────────────────── */
+
+.message.self .bubble::after,
+.message.other .bubble::after {
+  content: "";
+  position: absolute;
+  bottom: 0.35rem;
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+}
+.message.self .bubble::after {
+  right: -6px;
+  border-left-color: #2563eb;
+}
+.message.other .bubble::after {
+  left: -6px;
+  border-right-color: #e5e7eb;
 }
 
-.other .chat-bubble {
-  background: #e5e7eb;
-  color: #1e293b;
-  border-bottom-left-radius: 4px;
-}
 
-/* Name inside bubbles */
-.chat-bubble strong {
-  display: block;
-  font-size: 0.82rem;
-  opacity: 0.7;
-  margin-bottom: 3px;
-}
 
   </style>
 </head>
@@ -275,6 +265,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
