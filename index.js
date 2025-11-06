@@ -1,4 +1,4 @@
-// index.js (fixed & ready to paste)
+// index.js (updated - agent auto-open + convKey check)
 import { getUserFromToken, getAuthHeader } from "./authHelper.js";
 import { checkAuth, logout } from "./authGuard.js";
 
@@ -19,33 +19,48 @@ if (!session) {
 const { user, token, role } = session;
 const authHeader = getAuthHeader();
 
-// Hide right pane for agents
-if (role === "agent") rightPane.style.display = "none";
-else {
-  newChatBtn.addEventListener("click", () => {
-    const associate = prompt("Enter associate name:");
-    if (associate) createConversation(user.name, associate);
-  });
+// If agent — hide both side panes entirely
+if (role === "agent") {
+  if (leftPane) leftPane.style.display = "none";
+  if (rightPane) rightPane.style.display = "none";
+  if (newChatBtn) newChatBtn.style.display = "none";
+} else {
+  // non-agent: wire create conversation
+  if (newChatBtn) {
+    newChatBtn.addEventListener("click", () => {
+      const associate = prompt("Enter associate name:");
+      if (associate) createConversation(user.name, associate);
+    });
+  }
 }
 
-// Logout button
+// Logout button (always available)
 const logoutBtn = document.createElement("button");
 logoutBtn.textContent = "Logout";
 logoutBtn.style.cssText = "position:fixed;top:10px;right:10px;padding:0.4rem 0.8rem;background:#dc2626;color:white;border:none;border-radius:0.5rem;cursor:pointer;z-index:1000;";
-logoutBtn.onclick = logout;
+logoutBtn.onclick = () => {
+  // clear agent-specific keys plus token/user
+  try {
+    localStorage.removeItem("convKey");
+    localStorage.removeItem("trainerName");
+    localStorage.removeItem("role");
+    localStorage.removeItem("user");
+  } catch(e){}
+  logout();
+};
 document.body.appendChild(logoutBtn);
 
 // Global SSE + seen tracking
 let currentEventSource = null;
 let currentConvKey = null;
-let seenIds = new Set(); // ids displayed in UI for current conversation
+let seenIds = new Set();
 
 // Notification permission request (non-blocking)
 if ("Notification" in window && Notification.permission === "default") {
   Notification.requestPermission().catch(() => {});
 }
 
-// tiny beep data URI
+// tiny beep
 const notifAudio = (() => {
   const a = new Audio();
   a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQgAAAAA";
@@ -56,33 +71,91 @@ function playNotification() { try { notifAudio.play().catch(()=>{}); } catch(e){
 // ---------- Load conversations (role-aware) ----------
 async function loadConversations() {
   try {
-    let url;
-    if (role === "admin") {
-      url = `${API_BASE_URL}/conversations?all=true`;
-    } else if (role === "trainer") {
-      url = `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
-    } else {
-      // agent
-      url = `${API_BASE_URL}/conversations?associate=${encodeURIComponent(user.name)}`;
+    // admin/trainer: list mode
+    if (role === "admin" || role === "trainer") {
+      let url;
+      if (role === "admin") {
+        url = `${API_BASE_URL}/conversations?all=true`;
+      } else {
+        url = `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
+      }
+
+      const res = await fetch(url, { headers: { ...authHeader } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load conversations");
+
+      const myConvs = Array.isArray(data) ? data : [];
+      renderList("myConversations", myConvs);
+      const activeConvs = myConvs.filter(c => !c.ended);
+      renderList("activeConversations", activeConvs);
+      return;
     }
 
-    const res = await fetch(url, { headers: { ...authHeader } });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to load conversations");
-
-    // For admin we show all; for others filter is already applied by backend (but keep safe filter here)
-    const myConvs = Array.isArray(data) ? data : [];
-    renderList("myConversations", myConvs);
-    // Active pane (everyone can see active list - admin may want all active)
-    const activeConvs = myConvs.filter(c => !c.ended);
-    renderList("activeConversations", activeConvs);
+    // agent: use dedicated agent flow (auto open)
+    await loadAgentConversation();
   } catch (err) {
     console.error("Error loading conversations:", err);
-    // If 401/invalid token show friendly message & redirect
     if (err.message && err.message.toLowerCase().includes("invalid token")) {
       alert("Session invalid. Please login again.");
       logout();
     }
+  }
+}
+
+// ---------- Agent: load single conversation by convKey and open ----------
+// Behavior: if convKey missing/invalid/ended -> show message and redirect to login
+async function loadAgentConversation() {
+  try {
+    const convKey = localStorage.getItem("convKey");
+    if (!convKey) {
+      // No convKey in storage -> force logout and redirect to login
+      alert("Missing conversation key. Please login again.");
+      // clear agent local keys
+      try { localStorage.removeItem("role"); localStorage.removeItem("user"); localStorage.removeItem("trainerName"); } catch(e){}
+      window.location.href = "login.html";
+      return;
+    }
+
+    // fetch conversation
+    const res = await fetch(`${API_BASE_URL}/conversations?convKey=${encodeURIComponent(convKey)}`, {
+      headers: { ...authHeader },
+    });
+
+    // If 404 or bad request, backend will send appropriate code
+    if (res.status === 404 || res.status === 400) {
+      const err = await res.json().catch(()=>({ error: "Conversation not found" }));
+      console.warn("Agent conversation fetch failed:", err);
+      alert("This conversation is no longer active. Please contact your trainer.");
+      // clear keys and redirect
+      try { localStorage.removeItem("convKey"); localStorage.removeItem("role"); localStorage.removeItem("user"); localStorage.removeItem("trainerName"); } catch(e){}
+      window.location.href = "login.html";
+      return;
+    }
+
+    const conv = await res.json();
+    if (!res.ok) {
+      console.warn("Unexpected response loading conversation:", conv);
+      alert("This conversation is no longer active. Please contact your trainer.");
+      try { localStorage.removeItem("convKey"); localStorage.removeItem("role"); localStorage.removeItem("user"); localStorage.removeItem("trainerName"); } catch(e){}
+      window.location.href = "login.html";
+      return;
+    }
+
+    // If conversation ended -> redirect (Option B chosen)
+    if (conv.ended) {
+      alert("This conversation is no longer active. Please contact your trainer.");
+      try { localStorage.removeItem("convKey"); localStorage.removeItem("role"); localStorage.removeItem("user"); localStorage.removeItem("trainerName"); } catch(e){}
+      window.location.href = "login.html";
+      return;
+    }
+
+    // At this point, conversation is valid and active; auto-open
+    openConversation(conv);
+  } catch (err) {
+    console.error("loadAgentConversation error:", err);
+    alert("This conversation is no longer active. Please contact your trainer.");
+    try { localStorage.removeItem("convKey"); localStorage.removeItem("role"); localStorage.removeItem("user"); localStorage.removeItem("trainerName"); } catch(e){}
+    window.location.href = "login.html";
   }
 }
 
@@ -157,11 +230,11 @@ async function openConversation(conv) {
   currentConvKey = conv.conv_key;
   seenIds = new Set();
 
+  // Compact header as requested: "Trainer ↔ Associate  |  Key: XXXX"
   chatContent.innerHTML = `
     <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:#f9fafb;border-radius:10px;border:1px solid #e2e8f0;overflow:hidden;">
       <div id="chatHeader" style="background:#2563eb;color:white;padding:0.75rem;text-align:center;font-weight:600;">
-        ${conv.trainer_name} ↔ ${conv.associate_name}
-        <div style="font-size:0.8rem;opacity:0.9">Conversation Key: ${conv.conv_key}</div>
+        ${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} &nbsp; | &nbsp; Key: ${escapeHtml(conv.conv_key)}
       </div>
       <div id="messages" data-conv-key="${conv.conv_key}" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.4rem;background:white;"></div>
       <div id="chatInputArea" style="padding:0.5rem;display:flex;gap:0.5rem;border-top:1px solid #e5e7eb;background:#f8fafc;">
@@ -184,14 +257,14 @@ async function openConversation(conv) {
   // subscribe SSE live
   subscribeToMessages(conv.conv_key);
 
-  // send handler - we will rely on server-returned object and add its id to seenIds
+  // send handler
   async function handleSend() {
     const text = input.value.trim();
     if (!text) return;
     try {
       const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
       if (!newMsg || !newMsg.id) {
-        // fallback: render optimistic and trust SSE to fill in (but keep seen guard)
+        // optimistic render
         renderMessage(container, {
           id: `tmp-${Date.now()}`,
           sender_name: user.name,
@@ -200,13 +273,11 @@ async function openConversation(conv) {
           timestamp: new Date().toISOString()
         }, { scroll: true });
       } else {
-        // Mark seen so SSE doesn't duplicate
         seenIds.add(String(newMsg.id));
         renderMessage(container, newMsg, { scroll: true });
       }
       input.value = "";
       input.style.height = "44px";
-      // mark read after send
       await markConversationRead(conv.conv_key);
     } catch (err) {
       console.error("Send failed:", err);
@@ -229,7 +300,7 @@ async function openConversation(conv) {
 // ---------- Load messages (normal GET) ----------
 async function loadMessages(convKey) {
   try {
-    const res = await fetch(`${API_BASE_URL}/messages?convKey=${convKey}`, {
+    const res = await fetch(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(convKey)}`, {
       headers: { ...authHeader },
     });
     const rows = await res.json();
@@ -242,7 +313,7 @@ async function loadMessages(convKey) {
 
     rows.forEach(r => {
       renderMessage(container, r, { scroll: false });
-      seenIds.add(String(r.id));
+      if (r.id) seenIds.add(String(r.id));
     });
     container.scrollTop = container.scrollHeight;
   } catch (err) {
@@ -259,7 +330,7 @@ async function sendMessage(convKey, senderName, senderRole, text) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to send message");
-  return data; // inserted row with id
+  return data;
 }
 
 // ---------- Render message ----------
@@ -306,8 +377,8 @@ async function markConversationRead(convKey) {
       body: JSON.stringify({ convKey, userName: user.name }),
     });
     if (res.ok) {
-      // refresh badges
-      await loadConversations();
+      // refresh badges for trainers/admins
+      if (role !== "agent") await loadConversations();
     }
   } catch (err) {
     console.error("markConversationRead error:", err);
@@ -325,8 +396,8 @@ function subscribeToMessages(convKey) {
   const container = document.getElementById("messages");
   if (!container) return;
 
-  // Create EventSource (no custom headers possible); make sure backend CORS allows origin
-  const es = new EventSource(`${API_BASE_URL}/messages?convKey=${convKey}`);
+  // EventSource for server-sent events
+  const es = new EventSource(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(convKey)}`);
   currentEventSource = es;
 
   es.onmessage = async (ev) => {
@@ -347,12 +418,10 @@ function subscribeToMessages(convKey) {
       if (payload.type === "new" && Array.isArray(payload.messages)) {
         const shouldScroll = isNearBottom(container, 150);
         for (const m of payload.messages) {
-          // skip messages we've already displayed (send path added ID into seenIds)
           if (!m.id || !seenIds.has(String(m.id))) {
             if (m.id) seenIds.add(String(m.id));
             renderMessage(container, m, { scroll: false });
 
-            // notify + play sound for messages not by me
             if (m.sender_name !== user.name) {
               playNotification();
               if (document.hidden && "Notification" in window && Notification.permission === "granted") {
@@ -362,14 +431,9 @@ function subscribeToMessages(convKey) {
           }
         }
         if (shouldScroll) container.scrollTop = container.scrollHeight;
-
-        // refresh conversation badges in background (unread counts might have changed)
-        loadConversations().catch(() => {});
+        // refresh conversation badges only for non-agents
+        if (role !== "agent") loadConversations().catch(()=>{});
         return;
-      }
-
-      if (payload.type === "typing") {
-        // optional: hook in showTypingIndicator(payload.typing)
       }
     } catch (err) {
       console.error("SSE parse error:", err, ev.data);
