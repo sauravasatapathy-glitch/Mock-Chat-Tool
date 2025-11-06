@@ -41,46 +41,6 @@
 #myConversations li strong,
 #activeConversations li strong { font-weight: 600; }
 
-/* Message bubble minor polish */
-.message > div { transition: transform 0.05s ease; }
-.message.self > div { border-bottom-right-radius: 4px; }
-.message.other > div { border-bottom-left-radius: 4px; }
-
-/* Messages layout */
-#messages { display:flex; flex-direction:column; gap:0.6rem; padding:1rem; overflow:auto; }
-
-.message { display:flex; max-width:100%; }
-.message > div { max-width:72%; padding:0.6rem 0.9rem; border-radius:12px; word-wrap:break-word; }
-.message.self { justify-content:flex-end; }
-.message.self > div { background:#2563eb; color:#fff; border-bottom-right-radius:4px; }
-.message.other { justify-content:flex-start; }
-.message.other > div { background:#f1f5f9; color:#0b1220; border-bottom-left-radius:4px; }
-
-
-.message {
-  display: flex;
-  flex-direction: column;
-  max-width: 70%;
-  padding: 0.6rem 0.9rem;
-  border-radius: 1rem;
-  line-height: 1.4;
-  word-wrap: break-word;
-}
-
-.message.self {
-  align-self: flex-end;
-  background-color: #2563eb;
-  color: white;
-  border-bottom-right-radius: 0.3rem;
-}
-
-.message.other {
-  align-self: flex-start;
-  background-color: #e5e5ea;
-  color: black;
-  border-bottom-left-radius: 0.3rem;
-}
-
     /* === Panes === */
     #left-pane, #right-pane {
       width: 20%;
@@ -175,39 +135,61 @@
       background: #cbd5e1;
       border-radius: 3px;
     }
-    /* Chat messages layout fix */
+/* === CHAT MESSAGES === */
 #messages {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  gap: 0.6rem;
   padding: 1rem;
   overflow-y: auto;
-  max-height: 400px;
-  background: #fff;
-  border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
 }
 
 .message {
-  margin-bottom: 0.5rem;
-  max-width: 70%;
-  padding: 0.6rem 0.8rem;
-  border-radius: 1rem;
-  word-wrap: break-word;
-  line-height: 1.4;
+  display: flex;
+  width: 100%;
 }
 
+.chat-bubble {
+  max-width: 92%;
+  width: fit-content;
+  padding: 0.65rem 1rem;
+  border-radius: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  font-size: 0.95rem;
+  animation: bounceIn 0.15s ease;
+}
+
+/* agent/trainer alignment */
 .message.self {
-  align-self: flex-end;
-  background: #2563eb;
-  color: #fff;
+  justify-content: flex-end;
 }
 
 .message.other {
-  align-self: flex-start;
-  background: #e2e8f0;
-  color: #1e293b;
+  justify-content: flex-start;
 }
+
+/* visual styles */
+.self .chat-bubble {
+  background: #2563eb;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.other .chat-bubble {
+  background: #e5e7eb;
+  color: #1e293b;
+  border-bottom-left-radius: 4px;
+}
+
+/* Name inside bubbles */
+.chat-bubble strong {
+  display: block;
+  font-size: 0.82rem;
+  opacity: 0.7;
+  margin-bottom: 3px;
+}
+
   </style>
 </head>
 
@@ -236,6 +218,7 @@
   <script type="module" src="./index.js"></script>
 </body>
 </html>
+
 
 
 
