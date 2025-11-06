@@ -349,32 +349,24 @@ function renderMessage(container, msg, opts = { scroll: true }) {
   const isSelf = (sender === user.name) && (senderRole === role);
 
   const wrapper = document.createElement("div");
-  wrapper.className = `chat-bubble-wrapper ${isSelf ? "self" : "other"}`;
+  wrapper.className = `message ${isSelf ? "self" : "other"}`;
   if (msg.id) wrapper.dataset.id = msg.id;
 
   const bubble = document.createElement("div");
-  bubble.className = `chat-bubble ${isSelf ? "self" : "other"}`;
-
-  // ✅ Only show sender name if NOT self
-  const senderLabel = !isSelf ? `<strong class="msg-sender">${escapeHtml(sender)}</strong>` : "";
-
+  bubble.className = "bubble";
   bubble.innerHTML = `
-    ${senderLabel}
-    <div class="msg-text">${escapeHtml(msg.text || "")}</div>
-    <div class="msg-time">${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+    <span class="sender">${escapeHtml(sender)}</span>
+    <div>${escapeHtml(msg.text || "")}</div>
+    <span class="timestamp">
+      ${new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+    </span>
   `;
 
   wrapper.appendChild(bubble);
   container.appendChild(wrapper);
-
-  // ✅ Smooth scroll to bottom
-  if (opts.scroll) {
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: "smooth"
-    });
-  }
+  if (opts.scroll) container.scrollTop = container.scrollHeight;
 }
+
 
 
 // escape
