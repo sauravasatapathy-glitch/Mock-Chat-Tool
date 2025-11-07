@@ -15,15 +15,16 @@
   </script>
 
   <style>
-    /* === Lavender Unified Theme === */
-    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&display=swap');
 
+    /* === Lavender Unified Theme === */
     * {
       box-sizing: border-box;
     }
 
     body {
-      font-family: "Manrope", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      font-family: "Manrope", sans-serif;
+      font-size: 15px;
       margin: 0;
       background: #f4f6ff;
       height: 100vh;
@@ -43,6 +44,7 @@
       justify-content: space-between;
       padding: 0.75rem 0;
       box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
+      border-radius: 0 12px 12px 0;
     }
 
     #nav-top {
@@ -143,24 +145,24 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0;
-      padding: 0 16px;
       background: #111827;
       color: #ffffff;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 600;
       letter-spacing: 0.2px;
+      margin: 0;
       border-bottom: 1px solid #1f2937;
     }
 
     /* --- Left Pane --- */
     #left-pane {
       width: 280px;
-      background: #f4f6ff;
+      background: #f8faff;
       border-right: 2px solid #d1d5db;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
+      border-radius: 12px 0 0 12px;
     }
 
     ul {
@@ -170,7 +172,7 @@
     }
 
     li {
-      padding: 0.6rem;
+      padding: 0.7rem 0.9rem;
       border-bottom: 1px solid #f1f5f9;
       cursor: pointer;
       transition: background 0.2s ease;
@@ -190,6 +192,7 @@
       box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
       padding: 0 1rem 1rem 1rem;
       overflow: hidden;
+      border-radius: 0 12px 12px 0;
     }
 
     #chatContent {
@@ -232,108 +235,3 @@
     .bubble {
       max-width: 75%;
       padding: 0.6rem 0.9rem;
-      line-height: 1.45;
-      border-radius: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-      font-size: 0.95rem;
-      word-wrap: break-word;
-      animation: fadeIn 0.2s ease;
-    }
-
-    .self .bubble {
-      background: #2563eb;
-      color: #fff;
-      border-bottom-right-radius: 4px;
-    }
-
-    .other .bubble {
-      background: #e5e7eb;
-      color: #111827;
-      border-bottom-left-radius: 4px;
-    }
-
-    .sender {
-      font-size: 0.8rem;
-      opacity: 0.7;
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    .timestamp {
-      display: block;
-      font-size: 0.7rem;
-      opacity: 0.6;
-      margin-top: 0.3rem;
-      text-align: right;
-    }
-
-    #chatInput {
-      background: white;
-      border: 1px solid #c7d2fe;
-      border-radius: 8px;
-      padding: 0.6rem;
-      font-family: "Manrope", sans-serif;
-    }
-
-    #sendBtn {
-      background-color: #2563eb;
-      color: white;
-      transition: background 0.2s ease;
-      border-radius: 8px;
-    }
-
-    #sendBtn:hover {
-      background-color: #1e40af;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(3px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Scrollbars */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 3px;
-    }
-  </style>
-</head>
-
-<body>
-  <!-- Sidebar Nav Rail -->
-  <div id="nav-rail">
-    <div id="nav-top">
-      <div class="nav-item active" data-tab="home" title="Home"><i data-lucide="home"></i><span id="badge-home" class="badge"></span></div>
-      <div class="nav-item" data-tab="archive" title="Archive"><i data-lucide="archive"></i></div>
-      <div class="nav-item" data-tab="create" title="Create"><i data-lucide="plus-circle"></i></div>
-      <div class="nav-item" data-tab="queue" title="Queue"><i data-lucide="clock"></i></div>
-      <div class="nav-item" data-tab="reports" title="Reports"><i data-lucide="bar-chart-2"></i></div>
-    </div>
-
-    <div id="nav-bottom">
-      <button id="logoutBtn" title="Logout"><i data-lucide="log-out"></i></button>
-    </div>
-  </div>
-
-  <!-- Left Pane -->
-  <div id="left-pane">
-    <h3 class="app-header">Active Conversations</h3>
-    <ul id="activeConversations"></ul>
-  </div>
-
-  <!-- Main Chat Pane -->
-  <div id="chat-pane">
-    <h2 class="app-header">Lavender Chat Dashboard</h2>
-    <div id="chatContent">
-      <p style="color:#64748b;">Select or create a conversation to start chatting</p>
-    </div>
-  </div>
-
-  <!-- JS -->
-  <script type="module" src="./index.js"></script>
-</body>
-</html>
