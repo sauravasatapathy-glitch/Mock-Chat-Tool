@@ -327,7 +327,7 @@ onReady(async () => {
       endBtnEl.addEventListener("click", async () => {
         try {
           // try a likely endpoint; ignore failure and just disable locally
-          const res = await fetch(`${API_BASE_URL}/conversations/end`, {
+          const res = await fetch(`${API_BASE_URL}/conversations?end=true`, {
             method: "POST",
             headers: { "Content-Type": "application/json", ...authHeader },
             body: JSON.stringify({ convKey: currentConvKey }),
