@@ -424,4 +424,6 @@ function subscribeToMessages(convKey) {
 }
 
 // Load initial conversations
-loadConversations();
+document.addEventListener("DOMContentLoaded", () => {
+  loadConversations();
+});
