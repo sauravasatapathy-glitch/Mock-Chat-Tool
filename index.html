@@ -13,25 +13,45 @@
   </script>
 
   <style>
-    /* ===== Lavender v2 Unified Theme ===== */
+    /* ===== Lavender Theme (Light + Dark) ===== */
     :root {
       --lavender-lightest: #f7e8f6;
       --lavender-soft: #f1c6e7;
       --lavender-mid: #e5b0ea;
       --lavender-deep: #bd83ce;
       --lavender-strong: #b371c7;
+      --lavender-accent: #ff6584;
       --text-dark: #2d1b3d;
       --text-light: #fff;
+      --bg-main: var(--lavender-lightest);
+      --bg-card: #fff;
+      --bubble-self: var(--lavender-deep);
+      --bubble-other: var(--lavender-mid);
+      --shadow: rgba(189, 131, 206, 0.25);
+    }
+
+    body.dark-mode {
+      --bg-main: #2a1433;
+      --bg-card: #3a1d4d;
+      --text-dark: #f7e8f6;
+      --bubble-self: #b371c7;
+      --bubble-other: #6e4a8e;
+      --lavender-strong: #8a56a3;
+      --lavender-deep: #6e4a8e;
+      --lavender-mid: #4b2d68;
+      --lavender-soft: #3a1d4d;
+      --shadow: rgba(179, 113, 199, 0.4);
     }
 
     * {
       box-sizing: border-box;
+      transition: background 0.3s ease, color 0.3s ease, border 0.3s ease;
     }
 
     body {
       font-family: "Inter", sans-serif;
       margin: 0;
-      background: var(--lavender-lightest);
+      background: var(--bg-main);
       height: 100vh;
       display: flex;
       overflow: hidden;
@@ -48,7 +68,8 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.75rem 0;
-      box-shadow: 3px 0 10px rgba(179, 113, 199, 0.4);
+      box-shadow: 3px 0 10px var(--shadow);
+      position: relative;
     }
 
     #nav-top {
@@ -56,6 +77,7 @@
       flex-direction: column;
       align-items: center;
       gap: 1rem;
+      margin-top: 3rem;
     }
 
     .nav-item {
@@ -90,7 +112,7 @@
       position: absolute;
       top: 6px;
       right: 6px;
-      background: #ff6584;
+      background: var(--lavender-accent);
       color: white;
       font-size: 0.7rem;
       padding: 0.15rem 0.4rem;
@@ -106,7 +128,7 @@
     }
 
     #logoutBtn {
-      background: #ff6584;
+      background: var(--lavender-accent);
       border: none;
       color: white;
       width: 52px;
@@ -123,6 +145,33 @@
       background: #e04e6f;
     }
 
+    /* --- Theme Toggle --- */
+    #themeToggle {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 38px;
+      height: 38px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.25s ease;
+    }
+
+    #themeToggle:hover {
+      background: rgba(255,255,255,0.35);
+    }
+
+    #themeToggle svg {
+      stroke: white;
+      width: 20px;
+      height: 20px;
+    }
+
     /* --- Left Pane --- */
     #left-pane {
       width: 280px;
@@ -132,8 +181,7 @@
       flex-direction: column;
       overflow-y: auto;
       border-radius: 0 10px 10px 0;
-      box-shadow: 4px 0 10px rgba(189, 131, 206, 0.25);
-      transition: all 0.3s ease;
+      box-shadow: 4px 0 10px var(--shadow);
     }
 
     h3 {
@@ -151,12 +199,14 @@
       margin: 0;
       padding: 0;
     }
+
     li {
       padding: 0.6rem;
       border-bottom: 1px solid rgba(255,255,255,0.3);
       cursor: pointer;
       transition: background 0.25s ease, transform 0.1s ease;
     }
+
     li:hover {
       background: var(--lavender-mid);
       transform: translateX(2px);
@@ -167,10 +217,10 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #fff;
+      background: var(--bg-card);
       border-radius: 12px 0 0 12px;
       margin: 1rem;
-      box-shadow: 0 0 20px rgba(189, 131, 206, 0.2);
+      box-shadow: 0 0 20px var(--shadow);
       overflow: hidden;
     }
 
@@ -187,15 +237,13 @@
 
     #chatContent {
       flex: 1;
-      background: var(--lavender-lightest);
+      background: var(--bg-main);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      border-top: 1px solid #e0d2eb;
-      border-radius: 0 0 12px 0;
       text-align: center;
-      color: #5c4b63;
+      color: var(--text-dark);
     }
 
     /* --- Messages --- */
@@ -206,7 +254,7 @@
       flex-direction: column;
       gap: 0.6rem;
       padding: 1rem;
-      background: #fff;
+      background: var(--bg-card);
     }
 
     .message {
@@ -228,19 +276,19 @@
       border-radius: 16px;
       line-height: 1.5;
       font-size: 0.95rem;
-      box-shadow: 0 2px 8px rgba(189, 131, 206, 0.25);
+      box-shadow: 0 2px 8px var(--shadow);
       animation: fadeIn 0.25s ease;
     }
 
     .self .bubble {
-      background: var(--lavender-deep);
+      background: var(--bubble-self);
       color: white;
       border-bottom-right-radius: 4px;
     }
 
     .other .bubble {
-      background: var(--lavender-mid);
-      color: var(--text-dark);
+      background: var(--bubble-other);
+      color: var(--text-light);
       border-bottom-left-radius: 4px;
     }
 
@@ -259,36 +307,11 @@
       display: block;
     }
 
-    /* --- Buttons --- */
-    #newChatBtn, #sendBtn {
-      background: var(--lavender-strong);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 0.6rem 1rem;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-    }
-
-    #newChatBtn:hover, #sendBtn:hover {
-      background: var(--lavender-deep);
-    }
-
-    /* --- Input --- */
-    #chatInput {
-      background: white;
-      border: 1px solid var(--lavender-mid);
-      border-radius: 8px;
-      padding: 0.6rem;
-      resize: none;
-      font-family: "Inter", sans-serif;
-    }
-
     /* --- Scrollbar --- */
     ::-webkit-scrollbar {
       width: 6px;
     }
+
     ::-webkit-scrollbar-thumb {
       background: var(--lavender-mid);
       border-radius: 3px;
@@ -304,6 +327,8 @@
 <body>
   <!-- Sidebar Nav Rail -->
   <div id="nav-rail">
+    <div id="themeToggle" title="Toggle Theme"><i data-lucide="moon"></i></div>
+
     <div id="nav-top">
       <div class="nav-item active" data-tab="home" title="Home"><i data-lucide="home"></i><span id="badge-home" class="badge"></span></div>
       <div class="nav-item" data-tab="archive" title="Archive"><i data-lucide="archive"></i></div>
@@ -332,5 +357,27 @@
   </div>
 
   <script type="module" src="./index.js"></script>
+
+  <script>
+    // === Dark Mode Toggle Logic ===
+    const body = document.body;
+    const toggle = document.getElementById("themeToggle");
+    const icon = toggle.querySelector("i");
+
+    // Load preference
+    if (localStorage.getItem("lavenderTheme") === "dark") {
+      body.classList.add("dark-mode");
+      icon.setAttribute("data-lucide", "sun");
+      window.lucide.createIcons({ icons: window.lucide.icons });
+    }
+
+    toggle.addEventListener("click", () => {
+      body.classList.toggle("dark-mode");
+      const isDark = body.classList.contains("dark-mode");
+      localStorage.setItem("lavenderTheme", isDark ? "dark" : "light");
+      icon.setAttribute("data-lucide", isDark ? "sun" : "moon");
+      window.lucide.createIcons({ icons: window.lucide.icons });
+    });
+  </script>
 </body>
 </html>
