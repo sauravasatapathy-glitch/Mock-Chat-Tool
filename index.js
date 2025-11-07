@@ -182,11 +182,9 @@ onReady(async () => {
   }
 
   // ---- Filtering loader (Queue/Home/Archive) ----
-  async function loadConversations(view = "home") {
+  async function loadConversations(tab = "home") {
     try {
-      if (role === "agent") return loadAgentConversation();
-
-      const url =
+      let url =
         role === "admin"
           ? `${API_BASE_URL}/conversations?all=true`
           : `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
@@ -195,15 +193,16 @@ onReady(async () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load conversations");
 
-      const queue = data.filter((c) => (c.msg_count ?? 0) === 0 && !c.ended);
-      const home = data.filter((c) => (c.msg_count ?? 0) > 0 && !c.ended);
-      const archive = data.filter((c) => !!c.ended);
+      // categorize
+      const active = data.filter((c) => !c.ended && c.msg_count > 0);
+      const queued = data.filter((c) => !c.ended && (c.msg_count === 0 || !c.msg_count));
+      const archived = data.filter((c) => c.ended);
 
-      if (view === "queue") renderList("queueList", queue);
-      else if (view === "archive") renderList("archiveList", archive);
-      else renderList("activeConversations", home);
+      if (tab === "queue") renderList("queueList", queued);
+      else if (tab === "archive") renderList("archiveList", archived);
+      else renderList("activeConversations", active);
     } catch (err) {
-      console.error("loadConversations:", err);
+    console.error("loadConversations:", err);
       if (err.message?.toLowerCase().includes("invalid token")) {
         alert("Session invalid. Please login again.");
         logout();
@@ -305,9 +304,9 @@ onReady(async () => {
 
     chatContent.innerHTML = `
       <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:white;border-radius:12px;border:1px solid #E0E7FF;box-shadow:0 0 12px rgba(109,40,217,0.15);overflow:hidden;">
-        <div id="chatHeader" style="display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.6rem 0.75rem;font-weight:600;">
-          <span id="chatHeaderText">${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} | Key: ${escapeHtml(conv.conv_key)}</span>
-          ${endBtn}
+        <div id="chatHeader" style="background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.75rem;text-align:center;font-weight:600;display:flex;justify-content:center;align-items:center;gap:8px;">
+          <span id="headerTitle">${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} | Key: ${escapeHtml(conv.conv_key)}</span>
+          ${role !== "agent" ? '<button id="endvBtn" style="background:#9333EA;color:white;border:none;border-radius:6px;padding:0.25rem 0.6rem;font-size:0.8rem;cursor:pointer;">End</button>' : ""}
         </div>
         <div id="messages" data-conv-key="${conv.conv_key}" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.5rem;background:#FAF5FF;"></div>
         <div id="chatInputArea" style="padding:0.6rem;display:flex;gap:0.5rem;border-top:1px solid #E0E7FF;background:white;">
@@ -377,6 +376,12 @@ onReady(async () => {
         stopDurationTimer(currentConvKey);
         stopHeaderTimer();
       });
+    }
+    // If conversation is ended, disable input and show message
+    if (conv.ended) {
+      stopDurationTimer(conv.conv_key);
+      inputDisabledState(true);
+      showSystemMessage("This conversation has been ended by the trainer/admin.", container, "ended");
     }
 
     await loadMessages(conv.conv_key);
@@ -452,7 +457,20 @@ onReady(async () => {
     msg.textContent = text;
     container.appendChild(msg);
   }
-
+  function inputDisabledState(disabled = true) {
+    const input = document.getElementById("chatInput");
+    const sendBtn = document.getElementById("sendBtn");
+    if (!input || !sendBtn) return;
+    input.disabled = disabled;
+    sendBtn.disabled = disabled;
+    if (disabled) {
+      input.placeholder = "Conversation ended.";
+      input.style.opacity = "0.7";
+    } else {
+      input.placeholder = "Type a message...";
+      input.style.opacity = "1";
+    }
+  }
   function escapeHtml(s) {
     return String(s || "").replace(/[&<>"']/g, (m) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])
