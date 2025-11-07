@@ -13,7 +13,6 @@ const newChatBtn = document.getElementById("newChatBtn");
 const navRail = document.getElementById("nav-rail");
 
 window.lucide = { createIcons, icons };
-createIcons({ icons });
 
 // ===== AUTH =====
 const session = checkAuth(["admin", "trainer", "agent"]);
