@@ -392,6 +392,14 @@ async function markConversationRead(convKey) {
     body: JSON.stringify({ convKey, userName: user.name }),
   });
 }
+function showDesktopNotification(sender, text) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const n = new Notification(`💬 New message from ${sender}`, {
+    body: text.length > 60 ? text.slice(0, 60) + "…" : text,
+    icon: "/favicon.ico",
+  });
+  n.onclick = () => window.focus();
+}
 
 // SSE setup (unchanged)
 function subscribeToMessages(convKey) {
@@ -402,7 +410,11 @@ function subscribeToMessages(convKey) {
   es.onmessage = (e) => {
     const p = JSON.parse(e.data);
     if (p.type === "new") {
-      p.messages.forEach((m) => renderMessage(container, m));
+      p.messages.forEach((m) => {
+        renderMessage(container, m);
+      // 🔔 Trigger desktop notification only if not from self
+        if (m.sender_name !== user.name) showDesktopNotification(m.sender_name, m.text);
+      });
       if (role !== "agent") loadConversations();
     }
   };
