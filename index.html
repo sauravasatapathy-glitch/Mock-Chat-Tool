@@ -235,3 +235,109 @@
     .bubble {
       max-width: 75%;
       padding: 0.6rem 0.9rem;
+      line-height: 1.45;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      font-size: 0.95rem;
+      word-wrap: break-word;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .self .bubble {
+      background: #2563eb;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .other .bubble {
+      background: #e5e7eb;
+      color: #111827;
+      border-bottom-left-radius: 4px;
+    }
+
+    .sender {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .timestamp {
+      display: block;
+      font-size: 0.7rem;
+      opacity: 0.6;
+      margin-top: 0.3rem;
+      text-align: right;
+    }
+
+    #chatInput {
+      background: white;
+      border: 1px solid #c7d2fe;
+      border-radius: 8px;
+      padding: 0.6rem;
+      font-family: "Manrope", sans-serif;
+      font-size: 15px;
+    }
+
+    #sendBtn {
+      background-color: #2563eb;
+      color: white;
+      transition: background 0.2s ease;
+      border-radius: 8px;
+    }
+
+    #sendBtn:hover {
+      background-color: #1e40af;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Sidebar Nav Rail -->
+  <div id="nav-rail">
+    <div id="nav-top">
+      <div class="nav-item active" data-tab="home" title="Home"><i data-lucide="home"></i><span id="badge-home" class="badge"></span></div>
+      <div class="nav-item" data-tab="archive" title="Archive"><i data-lucide="archive"></i></div>
+      <div class="nav-item" data-tab="create" title="Create"><i data-lucide="plus-circle"></i></div>
+      <div class="nav-item" data-tab="queue" title="Queue"><i data-lucide="clock"></i></div>
+      <div class="nav-item" data-tab="reports" title="Reports"><i data-lucide="bar-chart-2"></i></div>
+    </div>
+
+    <div id="nav-bottom">
+      <button id="logoutBtn" title="Logout"><i data-lucide="log-out"></i></button>
+    </div>
+  </div>
+
+  <!-- Left Pane -->
+  <div id="left-pane">
+    <h3 class="app-header">Active Conversations</h3>
+    <ul id="activeConversations"></ul>
+  </div>
+
+  <!-- Main Chat Pane -->
+  <div id="chat-pane">
+    <h2 class="app-header">Lavender Chat Dashboard</h2>
+    <div id="chatContent">
+      <p style="color:#64748b;">Select or create a conversation to start chatting</p>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script type="module" src="./index.js"></script>
+</body>
+</html>
