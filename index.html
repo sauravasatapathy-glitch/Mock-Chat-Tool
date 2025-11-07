@@ -510,6 +510,37 @@ body.dark-mode button:hover {
   <script type="module" src="./index.js"></script>
 
   <script>
+    import { createIcons, icons } from "https://unpkg.com/lucide@latest/dist/esm/lucide.js";
+
+  // --- Fix Lucide undefined issue ---
+  document.addEventListener("DOMContentLoaded", () => {
+    window.lucide = { createIcons, icons };
+
+    // Initialize icons safely
+    if (window.lucide?.createIcons) {
+      window.lucide.createIcons({ icons });
+      console.log("✅ Lucide icons initialized");
+    }
+
+    // === Theme Toggle Support ===
+    const themeToggle = document.getElementById("themeToggle");
+    if (themeToggle) {
+      themeToggle.addEventListener("click", () => {
+        document.body.classList.toggle("dark-mode");
+        // Reinitialize icons after theme change
+        if (window.lucide?.createIcons) {
+          window.lucide.createIcons({ icons });
+        }
+      });
+    }
+
+    // === Desktop Notification check ===
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch((err) =>
+        console.warn("Notification permission error:", err)
+      );
+    }
+  });
     // === Dark Mode Toggle Logic ===
     const body = document.body;
     const toggle = document.getElementById("themeToggle");
@@ -531,6 +562,7 @@ body.dark-mode button:hover {
   </script>
 </body>
 </html>
+
 
 
 
