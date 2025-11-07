@@ -13,7 +13,7 @@
   </script>
 
   <style>
-    /* ===== Lavender Theme (Light + Dark) ===== */
+    /* ===== Lavender Theme (Light + Dark + Gradient Animation) ===== */
     :root {
       --lavender-lightest: #f7e8f6;
       --lavender-soft: #f1c6e7;
@@ -45,17 +45,30 @@
 
     * {
       box-sizing: border-box;
-      transition: background 0.3s ease, color 0.3s ease, border 0.3s ease;
+      transition: background 0.4s ease, color 0.3s ease, border 0.3s ease;
     }
 
+    /* Animated Gradient Background */
     body {
       font-family: "Inter", sans-serif;
       margin: 0;
-      background: var(--bg-main);
       height: 100vh;
       display: flex;
       overflow: hidden;
       color: var(--text-dark);
+      background: linear-gradient(-45deg,
+        var(--lavender-lightest),
+        var(--lavender-soft),
+        var(--lavender-mid),
+        var(--lavender-lightest));
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
 
     /* --- Nav Rail --- */
@@ -106,18 +119,6 @@
       width: 22px;
       height: 22px;
       stroke: white;
-    }
-
-    .badge {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      background: var(--lavender-accent);
-      color: white;
-      font-size: 0.7rem;
-      padding: 0.15rem 0.4rem;
-      border-radius: 999px;
-      display: none;
     }
 
     #nav-bottom {
@@ -205,6 +206,7 @@
       border-bottom: 1px solid rgba(255,255,255,0.3);
       cursor: pointer;
       transition: background 0.25s ease, transform 0.1s ease;
+      color: var(--text-dark);
     }
 
     li:hover {
@@ -225,14 +227,23 @@
     }
 
     #chat-pane h2 {
-      background: var(--lavender-strong);
+      background: var(--lavender-deep);
       color: var(--text-light);
       padding: 1rem;
       text-align: center;
       font-weight: 600;
       margin: 0;
       letter-spacing: 0.5px;
-      border-bottom: 3px solid var(--lavender-deep);
+      border-bottom: 3px solid var(--lavender-strong);
+    }
+
+    /* --- Chat Header in Conversation --- */
+    #chatHeader {
+      background: var(--lavender-strong);
+      color: var(--text-light);
+      font-weight: 600;
+      text-align: center;
+      padding: 0.75rem;
     }
 
     #chatContent {
@@ -288,7 +299,7 @@
 
     .other .bubble {
       background: var(--bubble-other);
-      color: var(--text-light);
+      color: var(--text-dark);
       border-bottom-left-radius: 4px;
     }
 
@@ -364,7 +375,6 @@
     const toggle = document.getElementById("themeToggle");
     const icon = toggle.querySelector("i");
 
-    // Load preference
     if (localStorage.getItem("lavenderTheme") === "dark") {
       body.classList.add("dark-mode");
       icon.setAttribute("data-lucide", "sun");
