@@ -1,40 +1,61 @@
-// index.js — Lavender UI (Safe load + Lucide sync + Notification fix)
-document.addEventListener("DOMContentLoaded", async () => {
-  // --- Safe Lucide import ---
+// index.js (Lavender UI — same logic, safe init/order only)
+
+// --- helper: run after DOM is ready, even if script loads early
+function onReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
+onReady(async () => {
+  // --- Safe Lucide: let index.html own theme toggle; we only ensure createIcons exists.
   try {
-    const { createIcons, icons } = await import("https://unpkg.com/lucide@latest/dist/esm/lucide.js");
-    window.lucide = { createIcons, icons };
-    createIcons({ icons });
-  } catch (err) {
-    console.error("Lucide load failed:", err);
+    // If index.html already set window.lucide, keep it. Otherwise load once here.
+    if (!window.lucide?.createIcons) {
+      const { createIcons, icons } = await import("https://unpkg.com/lucide@latest/dist/esm/lucide.js");
+      window.lucide = { createIcons, icons };
+      createIcons({ icons });
+      console.log("✅ Lucide ready in index.js");
+    } else {
+      // Make sure any <i data-lucide> in DOM gets upgraded
+      window.lucide.createIcons({ icons: window.lucide.icons });
+    }
+  } catch (e) {
+    console.warn("Lucide init skipped (using index.html loader)", e);
   }
 
-  // --- Imports ---
-  const { getUserFromToken, getAuthHeader } = await import("./authHelper.js");
+  // --- Imports (static in your original; kept static here for simplicity)
+  // Note: keep your original static imports if you prefer:
+  // import { createIcons, icons } from "https://unpkg.com/lucide@latest/dist/esm/lucide.js";
+  // import { getUserFromToken, getAuthHeader } from "./authHelper.js";
+  // import { checkAuth, logout } from "./authGuard.js";
+  const { getAuthHeader } = await import("./authHelper.js");
   const { checkAuth, logout } = await import("./authGuard.js");
 
   const API_BASE_URL = "https://mock-chat-backend.vercel.app/api";
 
-  // --- DOM refs ---
+  // ===== DOM =====
   const leftPane = document.getElementById("left-pane");
   const chatContent = document.getElementById("chatContent");
   const newChatBtn = document.getElementById("newChatBtn");
   const navRail = document.getElementById("nav-rail");
   const logoutBtn = document.getElementById("logoutBtn");
 
-  // --- Auth check ---
+  // ===== AUTH =====
   const session = checkAuth(["admin", "trainer", "agent"]);
   if (!session) {
     window.location.href = "login.html";
     throw new Error("Unauthorized");
   }
-  const { user, token, role } = session;
+  const { user, role } = session;
   const authHeader = getAuthHeader();
 
-  // --- Role-based layout ---
+  // ===== Role-based layout =====
   if (role === "agent") {
-    leftPane?.style.setProperty("display", "none");
-    newChatBtn?.style.setProperty("display", "none");
+    if (leftPane) leftPane.style.display = "none";
+    if (newChatBtn) newChatBtn.style.display = "none";
   } else if (newChatBtn) {
     newChatBtn.addEventListener("click", () => {
       const associate = prompt("Enter associate name:");
@@ -42,18 +63,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // --- Logout ---
+  // ===== Logout =====
   logoutBtn?.addEventListener("click", () => {
     ["convKey", "trainerName", "role", "user"].forEach((k) => localStorage.removeItem(k));
     logout();
   });
 
-  // --- Global state ---
+  // ===== Global vars =====
   let currentEventSource = null;
   let currentConvKey = null;
   let seenIds = new Set();
 
-  // ===== Nav Rail =====
+  // ===== UI helpers & flows (ALL functions declared before first use) =====
+
   function setActiveTab(tab) {
     document.querySelectorAll("#nav-rail .nav-item").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
@@ -61,25 +83,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderSidePane(tab);
   }
 
-  if (navRail && role !== "agent") {
-    navRail.addEventListener("click", (e) => {
-      const btn = e.target.closest(".nav-item");
-      if (!btn) return;
-      setActiveTab(btn.dataset.tab);
-    });
-  }
-
-  // ===== Dynamic Side Pane =====
   async function renderSidePane(tab) {
     if (!leftPane) return;
+
     const headerHTML = (title) =>
       `<h3 class="app-header" style="background:#6D28D9;color:white;text-align:center;padding:0.8rem;border-radius:10px 10px 0 0;margin:0;">${title}</h3>`;
 
     if (tab === "home") {
-      leftPane.innerHTML = `${headerHTML("Active Conversations")}<ul id="activeConversations" style="margin:0;padding:0;list-style:none;"></ul>`;
+      leftPane.innerHTML = `
+        ${headerHTML("Active Conversations")}
+        <ul id="activeConversations" style="margin:0;padding:0;list-style:none;"></ul>
+      `;
       await loadConversations();
     } else if (tab === "archive") {
-      leftPane.innerHTML = `${headerHTML("Archive")}<ul id="archiveList" style="list-style:none;padding:0;margin:0;"><li style="padding:.6rem;opacity:.7">Loading…</li></ul>`;
+      leftPane.innerHTML = `
+        ${headerHTML("Archive")}
+        <ul id="archiveList" style="list-style:none;padding:0;margin:0;">
+          <li style="padding:.6rem;opacity:.7">Loading…</li>
+        </ul>
+      `;
       await renderArchiveList();
     } else if (tab === "create") {
       leftPane.innerHTML = `
@@ -91,7 +113,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           <input id="createAssociate" placeholder="Associate name" class="lavender-input"/>
           <button id="createBtn" class="lavender-btn">Create</button>
           <div id="createNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
-        </div>`;
+        </div>
+      `;
+
       const t = document.getElementById("createTrainer");
       const a = document.getElementById("createAssociate");
       const btn = document.getElementById("createBtn");
@@ -119,27 +143,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       };
     } else if (tab === "queue") {
-      leftPane.innerHTML = `${headerHTML("Queue")}<ul id="queueList" style="list-style:none;padding:0;margin:0;"><li style="padding:.6rem;opacity:.7">Loading…</li></ul>`;
+      leftPane.innerHTML = `
+        ${headerHTML("Queue")}
+        <ul id="queueList" style="list-style:none;padding:0;margin:0;">
+          <li style="padding:.6rem;opacity:.7">Loading…</li>
+        </ul>
+      `;
       await renderQueueList();
     } else if (tab === "reports") {
-      leftPane.innerHTML = `${headerHTML("Reports")}
+      leftPane.innerHTML = `
+        ${headerHTML("Reports")}
         <div style="padding:1rem;display:flex;flex-direction:column;gap:10px;">
           <label>From</label><input type="date" id="rFrom" class="lavender-input"/>
           <label>To</label><input type="date" id="rTo" class="lavender-input"/>
           <button id="rExport" class="lavender-btn">Export CSV</button>
           <div id="rNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
-        </div>`;
-      document.getElementById("rExport").onclick = () => {
-        document.getElementById("rNote").textContent = "Coming soon: report export.";
-      };
+        </div>
+      `;
+      const btn = document.getElementById("rExport");
+      const note = document.getElementById("rNote");
+      btn.onclick = () => (note.textContent = "Coming soon: report export.");
     }
 
-    requestAnimationFrame(() => {
-      if (window.lucide?.createIcons) window.lucide.createIcons({ icons: window.lucide.icons });
-    });
+    // Repaint lucide after DOM changes (safe if index.html already owns it)
+    if (window.lucide?.createIcons) {
+      window.lucide.createIcons({ icons: window.lucide.icons });
+    }
   }
 
-  // ===== Conversations, Archive, Queue =====
   async function updateHomeBadge() {
     try {
       const badge = document.getElementById("badge-home");
@@ -167,8 +198,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       list.innerHTML = ended.length ? "" : `<li style="opacity:.7;padding:.6rem;">No archived</li>`;
       ended.forEach((c) => {
         const li = document.createElement("li");
-        li.innerHTML = `<strong>${c.trainer_name}</strong> ↔ ${c.associate_name}<br><span style="font-size:0.8rem;opacity:0.7;">${c.conv_key}</span>`;
-        li.onclick = () => openConversation(c);
+        li.innerHTML = `
+          <strong>${c.trainer_name}</strong> ↔ ${c.associate_name}<br>
+          <span style="font-size:0.8rem;opacity:0.7;">${c.conv_key}</span>`;
+        li.style.cssText =
+          "padding:.6rem;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background 0.2s;";
+        li.addEventListener("click", () => openConversation(c));
         list.appendChild(li);
       });
     } catch (e) {
@@ -177,7 +212,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ===== Load Conversations =====
+  async function renderQueueList() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/conversations?all=true`, { headers: { ...authHeader } });
+      const rows = await res.json();
+      const list = document.getElementById("queueList");
+      if (!res.ok) throw new Error(rows.error || "Failed to load");
+      const queued = (rows || []).filter(
+        (c) => !c.ended && (c.msg_count === 0 || c.unread_count === 0)
+      );
+      list.innerHTML = queued.length ? "" : `<li style="opacity:.7;padding:.6rem;">No queued conversations</li>`;
+      queued.forEach((c) => {
+        const li = document.createElement("li");
+        li.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
+        li.style.cssText =
+          "padding:.6rem;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background 0.2s;";
+        li.addEventListener("click", () => openConversation(c));
+        list.appendChild(li);
+      });
+    } catch (e) {
+      const list = document.getElementById("queueList");
+      if (list) list.innerHTML = `<li style="color:#b91c1c;padding:.6rem;">${e.message}</li>`;
+    }
+  }
+
   async function loadConversations() {
     try {
       if (role === "admin" || role === "trainer") {
@@ -216,7 +274,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           <span style="font-size:0.8rem;opacity:0.7;">${c.conv_key}</span>
         </div>
         ${c.unread_count ? `<span class="badge" style="background:#EF4444;color:#fff;padding:2px 6px;border-radius:12px;font-size:0.8rem;">${c.unread_count}</span>` : ""}`;
-      li.onclick = () => openConversation(c);
+      li.style.cssText =
+        "padding:0.6rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background 0.2s;";
+      li.addEventListener("click", () => openConversation(c));
       ul.appendChild(li);
     });
   }
@@ -244,11 +304,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ===== Chat Rendering =====
   async function openConversation(conv) {
     if (currentEventSource) currentEventSource.close();
     currentConvKey = conv.conv_key;
     seenIds = new Set();
+
     chatContent.innerHTML = `
       <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:white;border-radius:12px;border:1px solid #E0E7FF;box-shadow:0 0 12px rgba(109,40,217,0.15);overflow:hidden;">
         <div id="chatHeader" style="background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.75rem;text-align:center;font-weight:600;">
@@ -259,20 +319,24 @@ document.addEventListener("DOMContentLoaded", async () => {
           <textarea id="chatInput" placeholder="Type a message..." style="flex:1;height:44px;border:1px solid #C4B5FD;border-radius:0.5rem;padding:0.6rem;"></textarea>
           <button id="sendBtn" style="background:#6D28D9;color:white;border:none;border-radius:0.5rem;padding:0.6rem 1.2rem;cursor:pointer;font-weight:500;">Send</button>
         </div>
-      </div>`;
+      </div>
+    `;
+
     await loadMessages(conv.conv_key);
     await markConversationRead(conv.conv_key);
     subscribeToMessages(conv.conv_key);
+
     const input = document.getElementById("chatInput");
     const sendBtn = document.getElementById("sendBtn");
     const container = document.getElementById("messages");
-    sendBtn.onclick = async () => {
+
+    sendBtn.addEventListener("click", async () => {
       const text = input.value.trim();
       if (!text) return;
       const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
       renderMessage(container, newMsg, { scroll: true });
       input.value = "";
-    };
+    });
   }
 
   async function loadMessages(convKey) {
@@ -308,8 +372,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       max-width:70%;padding:0.6rem 0.9rem;border-radius:10px;
       background:${isSelf ? "#6D28D9" : "#EDE9FE"};
       color:${isSelf ? "white" : "#1E1B4B"};
-      box-shadow:0 2px 6px rgba(0,0,0,0.05);`;
-    const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      box-shadow:0 2px 6px rgba(0,0,0,0.05);
+    `;
+    const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     bubble.innerHTML = `<div>${escapeHtml(msg.text)}</div><div style="font-size:0.7rem;opacity:0.7;text-align:right;">${time}</div>`;
     wrapper.appendChild(bubble);
     container.appendChild(wrapper);
@@ -341,7 +409,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     n.onclick = () => window.focus();
   }
 
-  // SSE setup
   function subscribeToMessages(convKey) {
     if (currentEventSource) currentEventSource.close();
     const es = new EventSource(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(convKey)}`);
@@ -357,16 +424,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (role !== "agent") loadConversations();
       }
     };
-    es.onerror = () => setTimeout(() => subscribeToMessages(convKey), 3000);
+    es.onerror = () => {
+      setTimeout(() => subscribeToMessages(convKey), 3000);
+    };
   }
 
-  // ===== Initialize UI =====
+  // ===== Wire nav AFTER functions exist =====
+  if (navRail && role !== "agent") {
+    navRail.addEventListener("click", (e) => {
+      const btn = e.target.closest(".nav-item");
+      if (!btn) return;
+      setActiveTab(btn.dataset.tab);
+    });
+  }
+
+  // ===== Kick off =====
   if (role !== "agent") {
     setActiveTab("home");
-    await updateHomeBadge();
+    updateHomeBadge();
   } else {
-    await loadConversations();
+    // agents jump straight into conv
+    await loadAgentConversation();
   }
 
-  console.log("✅ Lavender Chat loaded successfully");
+  console.log("✅ Lavender app initialized");
 });
