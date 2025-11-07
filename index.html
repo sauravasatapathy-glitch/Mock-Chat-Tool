@@ -16,11 +16,14 @@
 
   <style>
     /* === Lavender Unified Theme === */
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+
     * {
       box-sizing: border-box;
     }
+
     body {
-      font-family: "Inter", sans-serif;
+      font-family: "Manrope", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
       margin: 0;
       background: #f4f6ff;
       height: 100vh;
@@ -134,23 +137,30 @@
       background: #b91c1c;
     }
 
+    /* --- Unified Headers --- */
+    .app-header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 0 16px;
+      background: #111827;
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      border-bottom: 1px solid #1f2937;
+    }
+
     /* --- Left Pane --- */
     #left-pane {
       width: 280px;
-      background: #f0f4ff;
+      background: #f4f6ff;
       border-right: 2px solid #d1d5db;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-    }
-
-    h3 {
-      background: #1e3a8a;
-      color: white;
-      padding: 0.9rem;
-      text-align: center;
-      margin: 0;
-      font-size: 1rem;
     }
 
     ul {
@@ -158,12 +168,15 @@
       margin: 0;
       padding: 0;
     }
+
     li {
       padding: 0.6rem;
       border-bottom: 1px solid #f1f5f9;
       cursor: pointer;
       transition: background 0.2s ease;
+      font-size: 0.95rem;
     }
+
     li:hover {
       background: #e0ecff;
     }
@@ -175,25 +188,15 @@
       display: flex;
       flex-direction: column;
       box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
-      padding: 1rem;
+      padding: 0 1rem 1rem 1rem;
       overflow: hidden;
-    }
-
-    #chatHeader {
-      background: #2563eb;
-      color: white;
-      font-weight: 600;
-      text-align: center;
-      padding: 0.75rem;
-      border-radius: 8px 8px 0 0;
     }
 
     #chatContent {
       flex: 1;
       border: 1px solid #e2e8f0;
-      border-radius: 0.5rem;
+      border-radius: 0 0 8px 8px;
       background: #ffffff;
-      margin-top: 1rem;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -267,12 +270,16 @@
     #chatInput {
       background: white;
       border: 1px solid #c7d2fe;
+      border-radius: 8px;
+      padding: 0.6rem;
+      font-family: "Manrope", sans-serif;
     }
 
     #sendBtn {
       background-color: #2563eb;
       color: white;
       transition: background 0.2s ease;
+      border-radius: 8px;
     }
 
     #sendBtn:hover {
@@ -288,6 +295,7 @@
     ::-webkit-scrollbar {
       width: 6px;
     }
+
     ::-webkit-scrollbar-thumb {
       background: #cbd5e1;
       border-radius: 3px;
@@ -313,21 +321,19 @@
 
   <!-- Left Pane -->
   <div id="left-pane">
-    <h3>Active Conversations</h3>
+    <h3 class="app-header">Active Conversations</h3>
     <ul id="activeConversations"></ul>
   </div>
 
   <!-- Main Chat Pane -->
   <div id="chat-pane">
-    <h2 style="margin:0;background:#111827;color:white;padding:0.9rem;text-align:center;border-left:1px solid #1e3a8a;">
-      Lavender Chat Dashboard
-    </h2>
+    <h2 class="app-header">Lavender Chat Dashboard</h2>
     <div id="chatContent">
       <p style="color:#64748b;">Select or create a conversation to start chatting</p>
     </div>
   </div>
 
-  <!-- Your JS -->
+  <!-- JS -->
   <script type="module" src="./index.js"></script>
 </body>
 </html>
