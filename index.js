@@ -44,6 +44,36 @@ onReady(async () => {
   let seenIds = new Set();            // robust de-dupe for SSE
   let timerId = null;                 // header duration timer
   let firstMsgTs = null;              // first message timestamp
+  let timerInterval = null;
+  let startTime = null;
+
+  function startDurationTimer(convKey) {
+    const header = document.getElementById("chatHeader");
+    if (!header) return;
+    if (!startTime) {
+      const stored = localStorage.getItem(`conv_start_${convKey}`);
+      startTime = stored ? new Date(stored) : new Date();
+      localStorage.setItem(`conv_start_${convKey}`, startTime.toISOString());
+    }
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      header.querySelector(".timer")?.remove();
+      const span = document.createElement("span");
+      span.className = "timer";
+      span.style.marginLeft = "8px";
+      span.textContent = `🕒 ${mins}:${secs.toString().padStart(2, "0")}`;
+      header.appendChild(span);
+    }, 1000);
+  }
+
+  function stopDurationTimer(convKey) {
+    if (timerInterval) clearInterval(timerInterval);
+    localStorage.removeItem(`conv_start_${convKey}`);
+    timerInterval = null;
+    startTime = null;
+  }
 
   // ---- helpers ----
   const isTrainerOrAdmin = () => role === "trainer" || role === "admin";
@@ -316,7 +346,10 @@ onReady(async () => {
         input.value = "";
         input.dispatchEvent(new Event("input"));
         await markConversationRead(conv.conv_key);
-      } catch (err) {
+        if (!conv.ended) startDurationTimer(conv.conv_key);
+        else stopDurationTimer(conv.conv_key);
+      }
+      catch (err) {
         alert(err.message || "Send failed");
       }
     });
@@ -341,6 +374,7 @@ onReady(async () => {
         // disable UI locally
         input.disabled = true;
         sendBtn.disabled = true;
+        stopDurationTimer(currentConvKey);
         stopHeaderTimer();
       });
     }
@@ -401,6 +435,22 @@ onReady(async () => {
     wrapper.appendChild(bubble);
     container.appendChild(wrapper);
     if (opts.scroll) container.scrollTop = container.scrollHeight;
+  }
+  function showSystemMessage(text, container = document.getElementById("messages")) {
+    if (!container) return;
+    const msg = document.createElement("div");
+    msg.style.cssText = `
+      text-align:center;
+      font-size:0.9rem;
+      opacity:0.7;
+      margin:0.5rem auto;
+      background:#F5F3FF;
+      padding:0.4rem 0.8rem;
+      border-radius:8px;
+      color:#4B3F72;
+    `;
+    msg.textContent = text;
+    container.appendChild(msg);
   }
 
   function escapeHtml(s) {
