@@ -6,18 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Lucide Icons -->
+<!-- ✅ Lucide Icons (guaranteed safe version) -->
 <script type="module">
-  import { createIcons, icons } from "https://unpkg.com/lucide@latest/dist/esm/lucide.js";
+  async function loadLucide() {
+    try {
+      // Import Lucide dynamically
+      const { createIcons, icons } = await import(
+        "https://unpkg.com/lucide@latest/dist/esm/lucide.js"
+      );
 
-  window.lucide = { createIcons, icons };
+      // Attach globally
+      window.lucide = { createIcons, icons };
 
-  document.addEventListener("DOMContentLoaded", () => {
-    // ensure DOM ready before creating icons
-    if (window.lucide && window.lucide.createIcons) {
-      window.lucide.createIcons({ icons: window.lucide.icons });
+      // Wait until DOM is ready
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.lucide?.createIcons) {
+          window.lucide.createIcons({ icons: window.lucide.icons });
+          console.log("✅ Lucide icons initialized safely.");
+        }
+      });
+    } catch (err) {
+      console.error("❌ Failed to load Lucide:", err);
     }
-  });
+  }
+
+  loadLucide();
 </script>
+
 
   <style>
     /* ===== Lavender Theme (Light + Dark + Gradient Animation) ===== */
@@ -398,4 +413,5 @@
   </script>
 </body>
 </html>
+
 
