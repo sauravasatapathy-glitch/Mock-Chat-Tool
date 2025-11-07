@@ -441,7 +441,25 @@ body.dark-mode #logoutBtn {
 body.dark-mode button:hover {
   background: linear-gradient(90deg, var(--lavender-deep), var(--lavender-accent));
 }
+/* Align chat and side panes at same vertical level */
+#chat-pane, #left-pane {
+  margin-top: 1rem;
+}
 
+#chat-pane {
+  margin-left: 0;
+  margin-right: 1rem;
+  border-radius: 12px;
+  height: calc(100vh - 2rem);
+}
+
+#left-pane {
+  height: calc(100vh - 2rem);
+}
+
+#chatContainer {
+  height: 100%;
+}
   </style>
 </head>
 
@@ -527,6 +545,7 @@ body.dark-mode button:hover {
 
 </body>
 </html>
+
 
 
 
