@@ -1,80 +1,52 @@
-// index.js (Lavender UI — same logic, safe init/order only)
+// index.js (Lavender UI — fixes + enhancements, no breaking API changes)
 
-// --- helper: run after DOM is ready, even if script loads early
 function onReady(fn) {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", fn, { once: true });
-  } else {
-    fn();
-  }
+  } else fn();
 }
 
 onReady(async () => {
-  // --- Safe Lucide: let index.html own theme toggle; we only ensure createIcons exists.
+  // Ensure lucide icons exist (index.html usually sets them)
   try {
-    // If index.html already set window.lucide, keep it. Otherwise load once here.
     if (!window.lucide?.createIcons) {
       const { createIcons, icons } = await import("https://unpkg.com/lucide@latest/dist/esm/lucide.js");
       window.lucide = { createIcons, icons };
       createIcons({ icons });
-      console.log("✅ Lucide ready in index.js");
     } else {
-      // Make sure any <i data-lucide> in DOM gets upgraded
       window.lucide.createIcons({ icons: window.lucide.icons });
     }
-  } catch (e) {
-    console.warn("Lucide init skipped (using index.html loader)", e);
-  }
+  } catch {}
 
-  // --- Imports (static in your original; kept static here for simplicity)
-  // Note: keep your original static imports if you prefer:
-  // import { createIcons, icons } from "https://unpkg.com/lucide@latest/dist/esm/lucide.js";
-  // import { getUserFromToken, getAuthHeader } from "./authHelper.js";
-  // import { checkAuth, logout } from "./authGuard.js";
   const { getAuthHeader } = await import("./authHelper.js");
   const { checkAuth, logout } = await import("./authGuard.js");
 
   const API_BASE_URL = "https://mock-chat-backend.vercel.app/api";
 
-  // ===== DOM =====
+  // DOM
   const leftPane = document.getElementById("left-pane");
   const chatContent = document.getElementById("chatContent");
-  const newChatBtn = document.getElementById("newChatBtn");
   const navRail = document.getElementById("nav-rail");
   const logoutBtn = document.getElementById("logoutBtn");
 
-  // ===== AUTH =====
+  // AUTH
   const session = checkAuth(["admin", "trainer", "agent"]);
   if (!session) {
     window.location.href = "login.html";
-    throw new Error("Unauthorized");
+    return;
   }
   const { user, role } = session;
   const authHeader = getAuthHeader();
 
-  // ===== Role-based layout =====
-  if (role === "agent") {
-    if (leftPane) leftPane.style.display = "none";
-    if (newChatBtn) newChatBtn.style.display = "none";
-  } else if (newChatBtn) {
-    newChatBtn.addEventListener("click", () => {
-      const associate = prompt("Enter associate name:");
-      if (associate) createConversation(user.name, associate);
-    });
-  }
-
-  // ===== Logout =====
-  logoutBtn?.addEventListener("click", () => {
-    ["convKey", "trainerName", "role", "user"].forEach((k) => localStorage.removeItem(k));
-    logout();
-  });
-
-  // ===== Global vars =====
+  // Globals
   let currentEventSource = null;
   let currentConvKey = null;
-  let seenIds = new Set();
+  let seenIds = new Set();            // robust de-dupe for SSE
+  let timerId = null;                 // header duration timer
+  let firstMsgTs = null;              // first message timestamp
 
-  // ===== UI helpers & flows (ALL functions declared before first use) =====
+  // ---- helpers ----
+  const isTrainerOrAdmin = () => role === "trainer" || role === "admin";
 
   function setActiveTab(tab) {
     document.querySelectorAll("#nav-rail .nav-item").forEach((btn) => {
@@ -94,15 +66,19 @@ onReady(async () => {
         ${headerHTML("Active Conversations")}
         <ul id="activeConversations" style="margin:0;padding:0;list-style:none;"></ul>
       `;
-      await loadConversations();
+      await loadConversations("home");
     } else if (tab === "archive") {
       leftPane.innerHTML = `
         ${headerHTML("Archive")}
-        <ul id="archiveList" style="list-style:none;padding:0;margin:0;">
-          <li style="padding:.6rem;opacity:.7">Loading…</li>
-        </ul>
+        <ul id="archiveList" style="list-style:none;padding:0;margin:0;"><li style="padding:.6rem;opacity:.7">Loading…</li></ul>
       `;
-      await renderArchiveList();
+      await loadConversations("archive");
+    } else if (tab === "queue") {
+      leftPane.innerHTML = `
+        ${headerHTML("Queue")}
+        <ul id="queueList" style="list-style:none;padding:0;margin:0;"><li style="padding:.6rem;opacity:.7">Loading…</li></ul>
+      `;
+      await loadConversations("queue");
     } else if (tab === "create") {
       leftPane.innerHTML = `
         ${headerHTML("Create Conversation")}
@@ -115,7 +91,6 @@ onReady(async () => {
           <div id="createNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
         </div>
       `;
-
       const t = document.getElementById("createTrainer");
       const a = document.getElementById("createAssociate");
       const btn = document.getElementById("createBtn");
@@ -142,14 +117,6 @@ onReady(async () => {
           note.textContent = e.message;
         }
       };
-    } else if (tab === "queue") {
-      leftPane.innerHTML = `
-        ${headerHTML("Queue")}
-        <ul id="queueList" style="list-style:none;padding:0;margin:0;">
-          <li style="padding:.6rem;opacity:.7">Loading…</li>
-        </ul>
-      `;
-      await renderQueueList();
     } else if (tab === "reports") {
       leftPane.innerHTML = `
         ${headerHTML("Reports")}
@@ -165,19 +132,15 @@ onReady(async () => {
       btn.onclick = () => (note.textContent = "Coming soon: report export.");
     }
 
-    // Repaint lucide after DOM changes (safe if index.html already owns it)
-    if (window.lucide?.createIcons) {
-      window.lucide.createIcons({ icons: window.lucide.icons });
-    }
+    if (window.lucide?.createIcons) window.lucide.createIcons({ icons: window.lucide.icons });
+    syncHeights();
   }
 
   async function updateHomeBadge() {
     try {
       const badge = document.getElementById("badge-home");
       if (!badge) return;
-      const res = await fetch(`${API_BASE_URL}/conversations?all=true`, {
-        headers: { ...authHeader },
-      });
+      const res = await fetch(`${API_BASE_URL}/conversations?all=true`, { headers: { ...authHeader } });
       const rows = await res.json();
       const unread = (rows || []).reduce((a, c) => a + (c.unread_count || 0), 0);
       badge.textContent = unread > 99 ? "99+" : String(unread);
@@ -188,71 +151,29 @@ onReady(async () => {
     }
   }
 
-  async function renderArchiveList() {
+  // ---- Filtering loader (Queue/Home/Archive) ----
+  async function loadConversations(view = "home") {
     try {
-      const res = await fetch(`${API_BASE_URL}/conversations?all=true`, { headers: { ...authHeader } });
+      if (role === "agent") return loadAgentConversation();
+
+      const url =
+        role === "admin"
+          ? `${API_BASE_URL}/conversations?all=true`
+          : `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
+
+      const res = await fetch(url, { headers: { ...authHeader } });
       const data = await res.json();
-      const list = document.getElementById("archiveList");
-      if (!res.ok) throw new Error(data.error || "Failed to load");
-      const ended = data.filter((c) => c.ended);
-      list.innerHTML = ended.length ? "" : `<li style="opacity:.7;padding:.6rem;">No archived</li>`;
-      ended.forEach((c) => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <strong>${c.trainer_name}</strong> ↔ ${c.associate_name}<br>
-          <span style="font-size:0.8rem;opacity:0.7;">${c.conv_key}</span>`;
-        li.style.cssText =
-          "padding:.6rem;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background 0.2s;";
-        li.addEventListener("click", () => openConversation(c));
-        list.appendChild(li);
-      });
-    } catch (e) {
-      const list = document.getElementById("archiveList");
-      if (list) list.innerHTML = `<li style="color:#b91c1c;padding:.6rem;">${e.message}</li>`;
-    }
-  }
+      if (!res.ok) throw new Error(data.error || "Failed to load conversations");
 
-  async function renderQueueList() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/conversations?all=true`, { headers: { ...authHeader } });
-      const rows = await res.json();
-      const list = document.getElementById("queueList");
-      if (!res.ok) throw new Error(rows.error || "Failed to load");
-      const queued = (rows || []).filter(
-        (c) => !c.ended && (c.msg_count === 0 || c.unread_count === 0)
-      );
-      list.innerHTML = queued.length ? "" : `<li style="opacity:.7;padding:.6rem;">No queued conversations</li>`;
-      queued.forEach((c) => {
-        const li = document.createElement("li");
-        li.textContent = `${c.trainer_name} ↔ ${c.associate_name} (${c.conv_key})`;
-        li.style.cssText =
-          "padding:.6rem;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background 0.2s;";
-        li.addEventListener("click", () => openConversation(c));
-        list.appendChild(li);
-      });
-    } catch (e) {
-      const list = document.getElementById("queueList");
-      if (list) list.innerHTML = `<li style="color:#b91c1c;padding:.6rem;">${e.message}</li>`;
-    }
-  }
+      const queue = data.filter((c) => (c.msg_count ?? 0) === 0 && !c.ended);
+      const home = data.filter((c) => (c.msg_count ?? 0) > 0 && !c.ended);
+      const archive = data.filter((c) => !!c.ended);
 
-  async function loadConversations() {
-    try {
-      if (role === "admin" || role === "trainer") {
-        const url =
-          role === "admin"
-            ? `${API_BASE_URL}/conversations?all=true`
-            : `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
-        const res = await fetch(url, { headers: { ...authHeader } });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load conversations");
-        const active = data.filter((c) => !c.ended);
-        renderList("activeConversations", active);
-      } else {
-        await loadAgentConversation();
-      }
+      if (view === "queue") renderList("queueList", queue);
+      else if (view === "archive") renderList("archiveList", archive);
+      else renderList("activeConversations", home);
     } catch (err) {
-      console.error("Error loading conversations:", err);
+      console.error("loadConversations:", err);
       if (err.message?.toLowerCase().includes("invalid token")) {
         alert("Session invalid. Please login again.");
         logout();
@@ -263,9 +184,7 @@ onReady(async () => {
   function renderList(id, items) {
     const ul = document.getElementById(id);
     if (!ul) return;
-    ul.innerHTML = items.length
-      ? ""
-      : `<li style="opacity:.7;padding:.6rem;">No conversations</li>`;
+    ul.innerHTML = items.length ? "" : `<li style="opacity:.7;padding:.6rem;">No conversations</li>`;
     items.forEach((c) => {
       const li = document.createElement("li");
       li.innerHTML = `
@@ -279,6 +198,7 @@ onReady(async () => {
       li.addEventListener("click", () => openConversation(c));
       ul.appendChild(li);
     });
+    syncHeights();
   }
 
   async function loadAgentConversation() {
@@ -304,39 +224,131 @@ onReady(async () => {
     }
   }
 
+  function formatDuration(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return (h ? h.toString().padStart(2, "0") + ":" : "") +
+           m.toString().padStart(2, "0") + ":" +
+           sec.toString().padStart(2, "0");
+  }
+
+  function startHeaderTimer(headerEl) {
+    stopHeaderTimer();
+    if (!firstMsgTs || !headerEl) return;
+    timerId = setInterval(() => {
+      const elapsed = Date.now() - firstMsgTs;
+      const base = headerEl.dataset.base || headerEl.textContent;
+      headerEl.dataset.base = base;
+      headerEl.textContent = `${base} • ${formatDuration(elapsed)}`;
+    }, 1000);
+  }
+  function stopHeaderTimer() {
+    if (timerId) clearInterval(timerId);
+    timerId = null;
+  }
+
+  function applyInputTheme(textarea) {
+    const dark = document.body.classList.contains("dark-mode");
+    textarea.style.background = dark ? "#3a1d4d" : "#ffffff";
+    textarea.style.color = dark ? "#f7e8f6" : "#1e293b";
+    textarea.style.border = dark ? "1px solid #8b5cf6" : "1px solid #C4B5FD";
+  }
+
+  function syncHeights() {
+    const chatPane = document.getElementById("chat-pane");
+    if (!chatPane || !leftPane) return;
+    leftPane.style.height = `${chatPane.clientHeight}px`;
+  }
+
   async function openConversation(conv) {
     if (currentEventSource) currentEventSource.close();
+    stopHeaderTimer();
     currentConvKey = conv.conv_key;
-    seenIds = new Set();
+    seenIds.clear();
+    firstMsgTs = null;
+
+    const endBtn = isTrainerOrAdmin()
+      ? `<button id="endConvBtn" class="lavender-btn" style="margin-left:8px;padding:0.35rem 0.7rem;border-radius:8px;">End</button>`
+      : "";
 
     chatContent.innerHTML = `
       <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:white;border-radius:12px;border:1px solid #E0E7FF;box-shadow:0 0 12px rgba(109,40,217,0.15);overflow:hidden;">
-        <div id="chatHeader" style="background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.75rem;text-align:center;font-weight:600;">
-          ${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} | Key: ${escapeHtml(conv.conv_key)}
+        <div id="chatHeader" style="display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.6rem 0.75rem;font-weight:600;">
+          <span id="chatHeaderText">${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} | Key: ${escapeHtml(conv.conv_key)}</span>
+          ${endBtn}
         </div>
         <div id="messages" data-conv-key="${conv.conv_key}" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.5rem;background:#FAF5FF;"></div>
         <div id="chatInputArea" style="padding:0.6rem;display:flex;gap:0.5rem;border-top:1px solid #E0E7FF;background:white;">
-          <textarea id="chatInput" placeholder="Type a message..." style="flex:1;height:44px;border:1px solid #C4B5FD;border-radius:0.5rem;padding:0.6rem;"></textarea>
-          <button id="sendBtn" style="background:#6D28D9;color:white;border:none;border-radius:0.5rem;padding:0.6rem 1.2rem;cursor:pointer;font-weight:500;">Send</button>
+          <textarea id="chatInput" placeholder="Type a message..." style="flex:1;min-height:64px;max-height:200px;resize:vertical;border:1px solid #C4B5FD;border-radius:0.6rem;padding:0.7rem;line-height:1.4;"></textarea>
+          <button id="sendBtn" style="background:#6D28D9;color:white;border:none;border-radius:0.6rem;padding:0 1.1rem;min-height:64px;cursor:pointer;font-weight:600;">Send</button>
         </div>
       </div>
     `;
 
-    await loadMessages(conv.conv_key);
-    await markConversationRead(conv.conv_key);
-    subscribeToMessages(conv.conv_key);
-
+    const headerEl = document.getElementById("chatHeaderText");
     const input = document.getElementById("chatInput");
     const sendBtn = document.getElementById("sendBtn");
     const container = document.getElementById("messages");
+    applyInputTheme(input);
+
+    // input behaviors
+    input.addEventListener("input", () => {
+      input.style.height = "auto";
+      const h = Math.min(input.scrollHeight, 200);
+      input.style.height = h + "px";
+    });
+    input.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
+        e.preventDefault();
+        sendBtn.click();
+      }
+      // Shift+Enter or Ctrl+Enter → newline (default)
+    });
 
     sendBtn.addEventListener("click", async () => {
       const text = input.value.trim();
       if (!text) return;
-      const newMsg = await sendMessage(conv.conv_key, user.name, role, text);
-      renderMessage(container, newMsg, { scroll: true });
-      input.value = "";
+      // IMPORTANT: do NOT render locally here (prevents duplicate with SSE)
+      try {
+        await sendMessage(conv.conv_key, user.name, role, text);
+        input.value = "";
+        input.dispatchEvent(new Event("input"));
+        await markConversationRead(conv.conv_key);
+      } catch (err) {
+        alert(err.message || "Send failed");
+      }
     });
+
+    // End conversation (trainer/admin only)
+    const endBtnEl = document.getElementById("endConvBtn");
+    if (endBtnEl) {
+      endBtnEl.addEventListener("click", async () => {
+        try {
+          // try a likely endpoint; ignore failure and just disable locally
+          const res = await fetch(`${API_BASE_URL}/conversations/end`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader },
+            body: JSON.stringify({ convKey: currentConvKey }),
+          }).catch(() => null);
+          // system message (centered)
+          const sys = document.createElement("div");
+          sys.style.cssText = "text-align:center;opacity:.8;margin:8px 0;";
+          sys.textContent = "— Conversation ended by trainer —";
+          container.appendChild(sys);
+        } catch {}
+        // disable UI locally
+        input.disabled = true;
+        sendBtn.disabled = true;
+        stopHeaderTimer();
+      });
+    }
+
+    await loadMessages(conv.conv_key);
+    await markConversationRead(conv.conv_key);
+    subscribeToMessages(conv.conv_key, headerEl);
+    syncHeights();
   }
 
   async function loadMessages(convKey) {
@@ -346,7 +358,14 @@ onReady(async () => {
     const rows = await res.json();
     const container = document.getElementById("messages");
     container.innerHTML = "";
-    rows.forEach((r) => renderMessage(container, r, { scroll: false }));
+    rows.forEach((r) => {
+      if (r.id) seenIds.add(String(r.id));
+      if (!firstMsgTs) firstMsgTs = Date.parse(r.timestamp || "") || Date.now();
+      renderMessage(container, r, { scroll: false });
+    });
+    if (!firstMsgTs && rows.length > 0) {
+      firstMsgTs = Date.parse(rows[0].timestamp || "") || Date.now();
+    }
     container.scrollTop = container.scrollHeight;
   }
 
@@ -369,7 +388,7 @@ onReady(async () => {
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.style.cssText = `
-      max-width:70%;padding:0.6rem 0.9rem;border-radius:10px;
+      max-width:75%;padding:0.7rem 1rem;border-radius:12px;
       background:${isSelf ? "#6D28D9" : "#EDE9FE"};
       color:${isSelf ? "white" : "#1E1B4B"};
       box-shadow:0 2px 6px rgba(0,0,0,0.05);
@@ -378,7 +397,7 @@ onReady(async () => {
       hour: "2-digit",
       minute: "2-digit",
     });
-    bubble.innerHTML = `<div>${escapeHtml(msg.text)}</div><div style="font-size:0.7rem;opacity:0.7;text-align:right;">${time}</div>`;
+    bubble.innerHTML = `<div>${escapeHtml(msg.text || "")}</div><div style="font-size:0.7rem;opacity:0.7;text-align:right;">${time}</div>`;
     wrapper.appendChild(bubble);
     container.appendChild(wrapper);
     if (opts.scroll) container.scrollTop = container.scrollHeight;
@@ -391,11 +410,14 @@ onReady(async () => {
   }
 
   async function markConversationRead(convKey) {
-    await fetch(`${API_BASE_URL}/messageRead`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader },
-      body: JSON.stringify({ convKey, userName: user.name }),
-    });
+    try {
+      await fetch(`${API_BASE_URL}/messageRead`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ convKey, userName: user.name }),
+      });
+      if (isTrainerOrAdmin()) updateHomeBadge().catch(() => {});
+    } catch {}
   }
 
   function showDesktopNotification(sender, text) {
@@ -403,33 +425,66 @@ onReady(async () => {
     if (Notification.permission === "default") Notification.requestPermission();
     if (Notification.permission !== "granted") return;
     const n = new Notification(`💬 New message from ${sender}`, {
-      body: text.length > 60 ? text.slice(0, 60) + "…" : text,
+      body: text && text.length > 60 ? text.slice(0, 60) + "…" : (text || ""),
       icon: "/favicon.ico",
     });
     n.onclick = () => window.focus();
   }
 
-  function subscribeToMessages(convKey) {
+  function subscribeToMessages(convKey, headerEl) {
     if (currentEventSource) currentEventSource.close();
     const es = new EventSource(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(convKey)}`);
     currentEventSource = es;
     const container = document.getElementById("messages");
+
     es.onmessage = (e) => {
-      const p = JSON.parse(e.data);
-      if (p.type === "new") {
-        p.messages.forEach((m) => {
-          renderMessage(container, m);
-          if (m.sender_name !== user.name) showDesktopNotification(m.sender_name, m.text);
-        });
-        if (role !== "agent") loadConversations();
+      try {
+        const p = JSON.parse(e.data);
+        if (p.type === "init" && Array.isArray(p.messages)) {
+          container.innerHTML = "";
+          seenIds.clear();
+          p.messages.forEach((m) => {
+            if (m.id) seenIds.add(String(m.id));
+            if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
+            renderMessage(container, m, { scroll: false });
+          });
+          if (firstMsgTs) startHeaderTimer(headerEl);
+          container.scrollTop = container.scrollHeight;
+          return;
+        }
+        if (p.type === "new" && Array.isArray(p.messages)) {
+          let gotNew = false;
+          for (const m of p.messages) {
+            const mid = m.id ? String(m.id) : null;
+            if (mid && seenIds.has(mid)) continue; // de-dupe
+            seenIds.add(mid);
+            // 🔑 Avoid double on sender screen: ignore SSE echo of self
+            if (m.sender_name === user.name) continue;
+            if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
+            renderMessage(container, m);
+            gotNew = true;
+            if (m.sender_name !== user.name) showDesktopNotification(m.sender_name, m.text || "");
+          }
+          if (gotNew && firstMsgTs) startHeaderTimer(headerEl);
+          if (isTrainerOrAdmin()) loadConversations("home").catch(() => {});
+        }
+      } catch (err) {
+        console.warn("SSE parse issue:", err);
       }
     };
+
     es.onerror = () => {
-      setTimeout(() => subscribeToMessages(convKey), 3000);
+      setTimeout(() => subscribeToMessages(convKey, headerEl), 3000);
     };
   }
 
-  // ===== Wire nav AFTER functions exist =====
+  // Logout
+  logoutBtn?.addEventListener("click", () => {
+    ["convKey", "trainerName", "role", "user"].forEach((k) => localStorage.removeItem(k));
+    logout();
+  });
+
+  // Nav
   if (navRail && role !== "agent") {
     navRail.addEventListener("click", (e) => {
       const btn = e.target.closest(".nav-item");
@@ -438,14 +493,14 @@ onReady(async () => {
     });
   }
 
-  // ===== Kick off =====
+  // Resize height sync
+  window.addEventListener("resize", syncHeights);
+
+  // Kickoff
   if (role !== "agent") {
     setActiveTab("home");
     updateHomeBadge();
   } else {
-    // agents jump straight into conv
     await loadAgentConversation();
   }
-
-  console.log("✅ Lavender app initialized");
 });
