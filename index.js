@@ -402,42 +402,25 @@ const endBtnEl = document.getElementById("endBtn");
 if (endBtnEl) {
   endBtnEl.addEventListener("click", async () => {
     try {
-      // Make sure we tell the backend to end it
       const res = await fetch(`${API_BASE_URL}/conversations?end=true`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ convKey: currentConvKey }),
       });
-
       if (!res.ok) throw new Error("Failed to end conversation");
 
-      // Insert visual "conversation ended" system message
-      const sys = document.createElement("div");
-      sys.style.cssText = `
-        text-align:center;
-        color:#DC2626;
-        margin:10px 0;
-        font-weight:600;
-      `;
-      sys.textContent = "— Conversation ended by trainer —";
-      container.appendChild(sys);
-
-      // Disable input for both sides
-      input.disabled = true;
-      sendBtn.disabled = true;
+      // Do not append local system message here; SSE will deliver it from backend.
+      inputDisabledState(true);
       stopDurationTimer(currentConvKey);
       stopHeaderTimer();
 
-      // If agent, show countdown logout overlay
-      if (role === "agent") {
-        showAgentLogoutCountdown(container);
-      }
     } catch (err) {
       console.error("End conversation failed:", err);
       alert("Could not end conversation.");
     }
   });
 }
+
 
 
 
