@@ -182,33 +182,54 @@ onReady(async () => {
   }
 
   // ---- Filtering loader (Queue/Home/Archive) ----
-  async function loadConversations(tab = "home") {
-    try {
-      let url =
-        role === "admin"
-          ? `${API_BASE_URL}/conversations?all=true`
-          : `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
+// ---- Filtering loader (Queue/Home/Archive) ----
+async function loadConversations(tab = "home") {
+  try {
+    const url =
+      role === "admin"
+        ? `${API_BASE_URL}/conversations?all=true`
+        : `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
 
-      const res = await fetch(url, { headers: { ...authHeader } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load conversations");
+    const res = await fetch(url, { headers: { ...authHeader } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to load conversations");
 
-      // categorize
-      const active = data.filter((c) => !c.ended && c.msg_count > 0);
-      const queued = data.filter((c) => !c.ended && (c.msg_count === 0 || !c.msg_count));
-      const archived = data.filter((c) => c.ended);
+    // Some backends don’t return msg_count. If missing, derive it on the fly.
+    // (Lightweight — only for items that aren’t ended.)
+    const needCounts = data.filter(c => !c.ended && (c.msg_count == null));
+    if (needCounts.length) {
+      await Promise.all(
+        needCounts.map(async (c) => {
+          try {
+            const r = await fetch(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(c.conv_key)}`, { headers: { ...authHeader } });
+            const arr = await r.json();
+            c._msg_count = Array.isArray(arr) ? arr.length : 0;
+          } catch {
+            c._msg_count = 0;
+          }
+        })
+      );
+    }
 
-      if (tab === "queue") renderList("queueList", queued);
-      else if (tab === "archive") renderList("archiveList", archived);
-      else renderList("activeConversations", active);
-    } catch (err) {
+    const getCount = (c) => (typeof c.msg_count === "number" ? c.msg_count : (c._msg_count || 0));
+
+    // categorize
+    const queued   = data.filter(c => !c.ended && getCount(c) === 0);
+    const active   = data.filter(c => !c.ended && getCount(c)  >  0);
+    const archived = data.filter(c =>  c.ended);
+
+    if (tab === "queue")       renderList("queueList", queued);
+    else if (tab === "archive")renderList("archiveList", archived);
+    else                       renderList("activeConversations", active);
+  } catch (err) {
     console.error("loadConversations:", err);
-      if (err.message?.toLowerCase().includes("invalid token")) {
-        alert("Session invalid. Please login again.");
-        logout();
-      }
+    if (err.message?.toLowerCase().includes("invalid token")) {
+      alert("Session invalid. Please login again.");
+      logout();
     }
   }
+}
+
 
   function renderList(id, items) {
     const ul = document.getElementById(id);
@@ -302,19 +323,26 @@ onReady(async () => {
       ? `<button id="endConvBtn" class="lavender-btn" style="margin-left:8px;padding:0.35rem 0.7rem;border-radius:8px;">End</button>`
       : "";
 
-    chatContent.innerHTML = `
-      <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:white;border-radius:12px;border:1px solid #E0E7FF;box-shadow:0 0 12px rgba(109,40,217,0.15);overflow:hidden;">
-        <div id="chatHeader" style="background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.75rem;text-align:center;font-weight:600;display:flex;justify-content:center;align-items:center;gap:8px;">
-          <span id="headerTitle">${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} | Key: ${escapeHtml(conv.conv_key)}</span>
-          ${role !== "agent" ? '<button id="endvBtn" style="background:#9333EA;color:white;border:none;border-radius:6px;padding:0.25rem 0.6rem;font-size:0.8rem;cursor:pointer;">End</button>' : ""}
-        </div>
-        <div id="messages" data-conv-key="${conv.conv_key}" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.5rem;background:#FAF5FF;"></div>
-        <div id="chatInputArea" style="padding:0.6rem;display:flex;gap:0.5rem;border-top:1px solid #E0E7FF;background:white;">
-          <textarea id="chatInput" placeholder="Type a message..." style="flex:1;min-height:64px;max-height:200px;resize:vertical;border:1px solid #C4B5FD;border-radius:0.6rem;padding:0.7rem;line-height:1.4;"></textarea>
-          <button id="sendBtn" style="background:#6D28D9;color:white;border:none;border-radius:0.6rem;padding:0 1.1rem;min-height:64px;cursor:pointer;font-weight:600;">Send</button>
-        </div>
-      </div>
-    `;
+// ... inside openConversation(conv) after you set chatContent.innerHTML = `
+chatContent.innerHTML = `
+  <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:white;border-radius:12px;border:1px solid #E0E7FF;box-shadow:0 0 12px rgba(109,40,217,0.15);overflow:hidden;">
+    <div id="chatHeader"
+         style="background:linear-gradient(90deg,#6D28D9,#9333EA);color:white;padding:0.75rem;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span id="chatHeaderText" style="text-align:left;">
+        ${escapeHtml(conv.trainer_name)} ↔ ${escapeHtml(conv.associate_name)} | Key: ${escapeHtml(conv.conv_key)}
+      </span>
+      ${role !== "agent"
+        ? '<button id="endBtn" style="background:#EF4444;color:white;border:none;border-radius:6px;padding:0.35rem 0.7rem;font-size:0.8rem;cursor:pointer;">End</button>'
+        : '<span></span>'}
+    </div>
+    <div id="messages" data-conv-key="${conv.conv_key}" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.5rem;background:#FAF5FF;"></div>
+    <div id="chatInputArea" style="padding:0.6rem;display:flex;gap:0.5rem;border-top:1px solid #E0E7FF;background:white;">
+      <textarea id="chatInput" placeholder="Type a message..." style="flex:1;min-height:64px;max-height:200px;resize:vertical;border:1px solid #C4B5FD;border-radius:0.6rem;padding:0.7rem;line-height:1.4;"></textarea>
+      <button id="sendBtn" style="background:#6D28D9;color:white;border:none;border-radius:0.6rem;padding:0 1.1rem;min-height:64px;cursor:pointer;font-weight:600;">Send</button>
+    </div>
+  </div>
+`;
+
 
     const headerEl = document.getElementById("chatHeaderText");
     const input = document.getElementById("chatInput");
@@ -336,47 +364,58 @@ onReady(async () => {
       // Shift+Enter or Ctrl+Enter → newline (default)
     });
 
-    sendBtn.addEventListener("click", async () => {
-      const text = input.value.trim();
-      if (!text) return;
-      // IMPORTANT: do NOT render locally here (prevents duplicate with SSE)
-      try {
-        await sendMessage(conv.conv_key, user.name, role, text);
-        input.value = "";
-        input.dispatchEvent(new Event("input"));
-        await markConversationRead(conv.conv_key);
-        if (!conv.ended) startDurationTimer(conv.conv_key);
-        else stopDurationTimer(conv.conv_key);
-      }
-      catch (err) {
-        alert(err.message || "Send failed");
-      }
-    });
+sendBtn.addEventListener("click", async () => {
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Optimistic render for sender so it appears instantly.
+  // We still ignore sender’s own messages in SSE to avoid duplicates.
+  renderMessage(container, {
+    sender_name: user.name,
+    text,
+    timestamp: new Date().toISOString()
+  }, { scroll: true });
+
+  try {
+    await sendMessage(conv.conv_key, user.name, role, text);
+    input.value = "";
+    input.dispatchEvent(new Event("input"));
+    await markConversationRead(conv.conv_key);
+  } catch (err) {
+    alert(err.message || "Send failed");
+  }
+});
+
 
     // End conversation (trainer/admin only)
-    const endBtnEl = document.getElementById("endConvBtn");
-    if (endBtnEl) {
-      endBtnEl.addEventListener("click", async () => {
-        try {
-          // try a likely endpoint; ignore failure and just disable locally
-          const res = await fetch(`${API_BASE_URL}/conversations?end=true`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeader },
-            body: JSON.stringify({ convKey: currentConvKey }),
-          }).catch(() => null);
-          // system message (centered)
-          const sys = document.createElement("div");
-          sys.style.cssText = "text-align:center;opacity:.8;margin:8px 0;";
-          sys.textContent = "— Conversation ended by trainer —";
-          container.appendChild(sys);
-        } catch {}
-        // disable UI locally
-        input.disabled = true;
-        sendBtn.disabled = true;
-        stopDurationTimer(currentConvKey);
-        stopHeaderTimer();
-      });
+const endBtnEl = document.getElementById("endBtn");
+if (endBtnEl) {
+  endBtnEl.addEventListener("click", async () => {
+    try {
+      // Update status on server (use whatever endpoint you already wired up)
+      await fetch(`${API_BASE_URL}/conversations?end=true`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ convKey: currentConvKey })
+      }).catch(() => null);
+
+      // Persist a system message so it also appears under Archive.
+      await sendMessage(currentConvKey, "System", "system", "Conversation ended by trainer/admin");
+
+      // Show immediately (centered, red)
+      showSystemMessage("Conversation ended by trainer/admin", document.getElementById("messages"), true);
+
+      // Lock input and stop timers
+      inputDisabledState(true);
+      stopHeaderTimer();
+    } catch (e) {
+      console.warn("End conversation error:", e);
+      inputDisabledState(true);
+      stopHeaderTimer();
     }
+  });
+}
+
     // If conversation is ended, disable input and show message
     if (conv.ended) {
       stopDurationTimer(conv.conv_key);
@@ -419,44 +458,60 @@ onReady(async () => {
     return data;
   }
 
-  function renderMessage(container, msg, opts = { scroll: true }) {
-    const sender = msg.sender_name || msg.sender || "Unknown";
-    const isSelf = sender === user.name;
-    const wrapper = document.createElement("div");
-    wrapper.className = `message ${isSelf ? "self" : "other"}`;
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.style.cssText = `
-      max-width:75%;padding:0.7rem 1rem;border-radius:12px;
-      background:${isSelf ? "#6D28D9" : "#EDE9FE"};
-      color:${isSelf ? "white" : "#1E1B4B"};
-      box-shadow:0 2px 6px rgba(0,0,0,0.05);
-    `;
-    const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    bubble.innerHTML = `<div>${escapeHtml(msg.text || "")}</div><div style="font-size:0.7rem;opacity:0.7;text-align:right;">${time}</div>`;
-    wrapper.appendChild(bubble);
-    container.appendChild(wrapper);
+function renderMessage(container, msg, opts = { scroll: true }) {
+  // System messages: role === 'system' OR sender_name === 'System'
+  if ((msg.role && msg.role.toLowerCase() === "system") || (msg.sender_name === "System")) {
+    showSystemMessage(msg.text || "System", container, /ended/i.test(msg.text || ""));
     if (opts.scroll) container.scrollTop = container.scrollHeight;
+    return;
   }
-  function showSystemMessage(text, container = document.getElementById("messages")) {
-    if (!container) return;
-    const msg = document.createElement("div");
-    msg.style.cssText = `
-      text-align:center;
-      font-size:0.9rem;
-      opacity:0.7;
-      margin:0.5rem auto;
-      background:#F5F3FF;
-      padding:0.4rem 0.8rem;
-      border-radius:8px;
-      color:#4B3F72;
-    `;
-    msg.textContent = text;
-    container.appendChild(msg);
-  }
+
+  const sender = msg.sender_name || msg.sender || "Unknown";
+  const isSelf = sender === user.name;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = `message ${isSelf ? "self" : "other"}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.style.cssText = `
+    max-width:75%;padding:0.7rem 1rem;border-radius:12px;
+    background:${isSelf ? "#6D28D9" : "#EDE9FE"};
+    color:${isSelf ? "white" : "#1E1B4B"};
+    box-shadow:0 2px 6px rgba(0,0,0,0.05);
+  `;
+
+  const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  bubble.innerHTML = `<div>${escapeHtml(msg.text || "")}</div>
+                      <div style="font-size:0.7rem;opacity:0.7;text-align:right;">${time}</div>`;
+  wrapper.appendChild(bubble);
+  container.appendChild(wrapper);
+
+  if (opts.scroll) container.scrollTop = container.scrollHeight;
+}
+
+function showSystemMessage(text, container = document.getElementById("messages"), isEnd = false) {
+  if (!container) return;
+  const msg = document.createElement("div");
+  msg.style.cssText = `
+    text-align:center;
+    font-size:0.9rem;
+    margin:0.5rem auto;
+    padding:0.4rem 0.8rem;
+    border-radius:8px;
+    background: ${isEnd ? "#FEE2E2" : "#F5F3FF"};
+    color: ${isEnd ? "#B91C1C" : "#4B3F72"};
+    font-weight: ${isEnd ? "700" : "600"};
+    max-width: 80%;
+  `;
+  msg.textContent = text;
+  container.appendChild(msg);
+}
+
   function inputDisabledState(disabled = true) {
     const input = document.getElementById("chatInput");
     const sendBtn = document.getElementById("sendBtn");
