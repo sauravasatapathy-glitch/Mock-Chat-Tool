@@ -604,100 +604,82 @@ function showAgentLogoutCountdown(container) {
     n.onclick = () => window.focus();
   }
 
-  function subscribeToMessages(convKey, headerEl) {
-    if (currentEventSource) currentEventSource.close();
-    const es = new EventSource(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(convKey)}`);
-    currentEventSource = es;
-    const container = document.getElementById("messages");
+function subscribeToMessages(convKey, headerEl) {
+  if (currentEventSource) currentEventSource.close();
+  const es = new EventSource(`${API_BASE_URL}/messages?convKey=${encodeURIComponent(convKey)}`);
+  currentEventSource = es;
+  const container = document.getElementById("messages");
 
-    es.onmessage = (e) => {
-      try {
-        const p = JSON.parse(e.data);
-        if (p.type === "init" && Array.isArray(p.messages)) {
-          container.innerHTML = "";
-          seenIds.clear();
-          p.messages.forEach((m) => {
-            if (m.id) seenIds.add(String(m.id));
-            if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
-            renderMessage(container, m, { scroll: false });
-          });
-          if (firstMsgTs) startHeaderTimer(headerEl);
-          container.scrollTop = container.scrollHeight;
-          return;
-        }
-        if (p.type === "new" && Array.isArray(p.messages)) {
-          let gotNew = false;
-          for (const m of p.messages) {
-            // --- handle 'conversation ended' system message ---
-            const isSystem = (m.role && m.role.toLowerCase() === "system") || m.sender_name === "System";
-            const text = (m.text || "").toLowerCase();
+  es.onmessage = (e) => {
+    try {
+      const p = JSON.parse(e.data);
 
-            if (isSystem && text.includes("conversation ended")) {
-              // Disable input for everyone
-              inputDisabledState(true);
-              stopDurationTimer(convKey);
-              stopHeaderTimer();
-
-              // Render as system (you already do via renderMessage/showSystemMessage)
-              renderMessage(container, m);
-
-              // Agent-only logout countdown overlay
-              if (role === "agent") {
-                showAgentLogoutCountdown(container);
-              }
-
-              // Also refresh lists so it moves to Archive in UI
-              if (isTrainerOrAdmin()) {
-                loadConversations("archive").catch(() => {});
-              }
-
-              continue; // handled
-            }
-
-            // ---- existing code (de-dupe + ignore SSE echo of sender) ----
-            const mid = m.id ? String(m.id) : null;
-            if (mid && seenIds.has(mid)) continue;
-              seenIds.add(mid);
-            if (m.sender_name === user.name) continue;
-
-            if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
-            renderMessage(container, m);
-            gotNew = true;
-            if (m.sender_name !== user.name) showDesktopNotification(m.sender_name, m.text || "");
-          }
-      } catch (err) {
-        console.warn("SSE parse issue:", err);
+      // --- initial batch of messages ---
+      if (p.type === "init" && Array.isArray(p.messages)) {
+        container.innerHTML = "";
+        seenIds.clear();
+        p.messages.forEach((m) => {
+          if (m.id) seenIds.add(String(m.id));
+          if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
+          renderMessage(container, m, { scroll: false });
+        });
+        if (firstMsgTs) startHeaderTimer(headerEl);
+        container.scrollTop = container.scrollHeight;
+        return;
       }
-    };
 
-    es.onerror = () => {
-      setTimeout(() => subscribeToMessages(convKey, headerEl), 3000);
-    };
-  }
+      // --- new messages or system events ---
+      if (p.type === "new" && Array.isArray(p.messages)) {
+        let gotNew = false;
 
-  // Logout
-  logoutBtn?.addEventListener("click", () => {
-    ["convKey", "trainerName", "role", "user"].forEach((k) => localStorage.removeItem(k));
-    logout();
-  });
+        for (const m of p.messages) {
+          const isSystem =
+            (m.role && m.role.toLowerCase() === "system") || m.sender_name === "System";
+          const text = (m.text || "").toLowerCase();
 
-  // Nav
-  if (navRail && role !== "agent") {
-    navRail.addEventListener("click", (e) => {
-      const btn = e.target.closest(".nav-item");
-      if (!btn) return;
-      setActiveTab(btn.dataset.tab);
-    });
-  }
+          // 🟥 Detect conversation ended system message
+          if (isSystem && text.includes("conversation ended")) {
+            inputDisabledState(true);
+            stopDurationTimer(convKey);
+            stopHeaderTimer();
+            renderMessage(container, m); // display the system msg
 
-  // Resize height sync
-  window.addEventListener("resize", syncHeights);
+            if (role === "agent") {
+              showAgentLogoutCountdown(container);
+            }
+            if (isTrainerOrAdmin()) {
+              loadConversations("archive").catch(() => {});
+            }
+            continue; // skip rest of loop
+          }
 
-  // Kickoff
-  if (role !== "agent") {
-    setActiveTab("home");
-    updateHomeBadge();
-  } else {
-    await loadAgentConversation();
-  }
-});
+          // regular message flow
+          const mid = m.id ? String(m.id) : null;
+          if (mid && seenIds.has(mid)) continue;
+          seenIds.add(mid);
+          if (m.sender_name === user.name) continue;
+
+          if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
+          renderMessage(container, m);
+          gotNew = true;
+          if (m.sender_name !== user.name)
+            showDesktopNotification(m.sender_name, m.text || "");
+        }
+
+        if (gotNew && firstMsgTs) startHeaderTimer(headerEl);
+
+        // optional: stop timer if backend includes flag
+        if (p.ended === true) stopHeaderTimer();
+
+        if (isTrainerOrAdmin()) loadConversations("home").catch(() => {});
+      }
+    } catch (err) {
+      console.warn("SSE parse issue:", err);
+    }
+  };
+
+  es.onerror = () => {
+    setTimeout(() => subscribeToMessages(convKey, headerEl), 3000);
+  };
+}
+
