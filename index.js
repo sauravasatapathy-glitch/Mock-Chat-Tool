@@ -396,31 +396,43 @@ const endBtnEl = document.getElementById("endBtn");
 if (endBtnEl) {
   endBtnEl.addEventListener("click", async () => {
     try {
-      await fetch(`${API_BASE_URL}/conversations?end=true`, {
+      // Make sure we tell the backend to end it
+      const res = await fetch(`${API_BASE_URL}/conversations?end=true`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ convKey: currentConvKey }),
-      }).catch(() => null);
+      });
 
-      // Show system message (visible to both roles)
+      if (!res.ok) throw new Error("Failed to end conversation");
+
+      // Insert visual "conversation ended" system message
       const sys = document.createElement("div");
-      sys.style.cssText = "text-align:center;color:#DC2626;margin:10px 0;font-weight:600;";
+      sys.style.cssText = `
+        text-align:center;
+        color:#DC2626;
+        margin:10px 0;
+        font-weight:600;
+      `;
       sys.textContent = "— Conversation ended by trainer —";
       container.appendChild(sys);
-    } catch {}
 
-    // Disable both sides immediately
-    input.disabled = true;
-    sendBtn.disabled = true;
-    stopDurationTimer(currentConvKey);
-    stopHeaderTimer();
+      // Disable input for both sides
+      input.disabled = true;
+      sendBtn.disabled = true;
+      stopDurationTimer(currentConvKey);
+      stopHeaderTimer();
 
-    // If agent is viewing this conversation, show 30s countdown
-    if (role === "agent") {
-      showAgentLogoutCountdown(container);
+      // If agent, show countdown logout overlay
+      if (role === "agent") {
+        showAgentLogoutCountdown(container);
+      }
+    } catch (err) {
+      console.error("End conversation failed:", err);
+      alert("Could not end conversation.");
     }
   });
 }
+
 
 
     // If conversation is ended, disable input and show message
@@ -533,30 +545,47 @@ function showSystemMessage(text, container = document.getElementById("messages")
       input.style.opacity = "1";
     }
   }
-  function showAgentLogoutCountdown(container) {
-  const countdownEl = document.createElement("div");
-  countdownEl.style.cssText = `
-    text-align:center;
-    font-size:0.95rem;
-    color:#b91c1c;
+function showAgentLogoutCountdown(container) {
+  // Blur overlay
+  const overlay = document.createElement("div");
+  overlay.style.cssText = `
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    backdrop-filter:blur(3px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:white;
+    font-size:1.2rem;
     font-weight:600;
-    margin:1rem 0;
+    z-index:1000;
+    flex-direction:column;
+    transition:opacity 0.5s ease;
   `;
+
   let remaining = 30;
-  countdownEl.textContent = `Session ending in ${remaining}s...`;
-  container.appendChild(countdownEl);
+  const msg = document.createElement("div");
+  msg.textContent = `Conversation ended. Logging out in ${remaining}s...`;
+
+  overlay.appendChild(msg);
+  container.appendChild(overlay);
 
   const timer = setInterval(() => {
     remaining--;
+    msg.textContent = `Conversation ended. Logging out in ${remaining}s...`;
+
     if (remaining <= 0) {
       clearInterval(timer);
-      countdownEl.textContent = "Session ended.";
-      logout();
-    } else {
-      countdownEl.textContent = `Session ending in ${remaining}s...`;
+      msg.textContent = "Session ended.";
+      overlay.style.opacity = "0";
+      setTimeout(() => {
+        logout();
+      }, 1000);
     }
   }, 1000);
 }
+
 
   function escapeHtml(s) {
     return String(s || "").replace(/[&<>"']/g, (m) =>
