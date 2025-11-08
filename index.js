@@ -323,7 +323,6 @@ async function loadConversations(tab = "home") {
       ? `<button id="endConvBtn" class="lavender-btn" style="margin-left:8px;padding:0.35rem 0.7rem;border-radius:8px;">End</button>`
       : "";
 
-// ... inside openConversation(conv) after you set chatContent.innerHTML = `
 chatContent.innerHTML = `
   <div id="chatContainer" style="display:flex;flex-direction:column;height:80vh;width:100%;background:white;border-radius:12px;border:1px solid #E0E7FF;box-shadow:0 0 12px rgba(109,40,217,0.15);overflow:hidden;">
     <div id="chatHeader"
@@ -342,6 +341,11 @@ chatContent.innerHTML = `
     </div>
   </div>
 `;
+// Small visual polish: ensure "End" button hugs the right edge
+const chatHeaderEl = document.getElementById("chatHeader");
+if (chatHeaderEl) {
+  chatHeaderEl.style.paddingRight = "0.9rem";
+}
 
 
     const headerEl = document.getElementById("chatHeaderText");
