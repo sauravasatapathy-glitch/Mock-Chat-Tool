@@ -264,8 +264,14 @@ async function loadConversations(tab = "home") {
         headers: { ...authHeader },
       });
       if (res.status >= 400) throw new Error("Conversation not found or inactive.");
-      const conv = await res.json();
-      if (!conv || conv.ended) throw new Error("This conversation is no longer active.");
+const conv = await res.json();
+if (!conv || conv.ended) {
+  alert("This conversation is no longer active.");
+  // ✅ clear keys before redirect to stop the loop
+  ["convKey", "role", "user", "trainerName"].forEach((k) => localStorage.removeItem(k));
+  window.location.href = "login.html";
+  return;
+}
       openConversation(conv);
     } catch (err) {
       console.error("Agent load failed:", err);
@@ -639,19 +645,43 @@ function showAgentLogoutCountdown(container) {
         if (p.type === "new" && Array.isArray(p.messages)) {
           let gotNew = false;
           for (const m of p.messages) {
+            // --- handle 'conversation ended' system message ---
+            const isSystem = (m.role && m.role.toLowerCase() === "system") || m.sender_name === "System";
+            const text = (m.text || "").toLowerCase();
+
+            if (isSystem && text.includes("conversation ended")) {
+              // Disable input for everyone
+              inputDisabledState(true);
+              stopDurationTimer(convKey);
+              stopHeaderTimer();
+
+              // Render as system (you already do via renderMessage/showSystemMessage)
+              renderMessage(container, m);
+
+              // Agent-only logout countdown overlay
+              if (role === "agent") {
+                showAgentLogoutCountdown(container);
+              }
+
+              // Also refresh lists so it moves to Archive in UI
+              if (isTrainerOrAdmin()) {
+                loadConversations("archive").catch(() => {});
+              }
+
+              continue; // handled
+            }
+
+            // ---- existing code (de-dupe + ignore SSE echo of sender) ----
             const mid = m.id ? String(m.id) : null;
-            if (mid && seenIds.has(mid)) continue; // de-dupe
-            seenIds.add(mid);
-            // 🔑 Avoid double on sender screen: ignore SSE echo of self
+            if (mid && seenIds.has(mid)) continue;
+              seenIds.add(mid);
             if (m.sender_name === user.name) continue;
+
             if (!firstMsgTs) firstMsgTs = Date.parse(m.timestamp || "") || Date.now();
             renderMessage(container, m);
             gotNew = true;
             if (m.sender_name !== user.name) showDesktopNotification(m.sender_name, m.text || "");
           }
-          if (gotNew && firstMsgTs) startHeaderTimer(headerEl);
-          if (isTrainerOrAdmin()) loadConversations("home").catch(() => {});
-        }
       } catch (err) {
         console.warn("SSE parse issue:", err);
       }
