@@ -392,33 +392,36 @@ sendBtn.addEventListener("click", async () => {
 
 
     // End conversation (trainer/admin only)
-const endBtnEl = document.getElementById("endBtn");
+const endBtnEl = document.getElementById("endConvBtn");
 if (endBtnEl) {
   endBtnEl.addEventListener("click", async () => {
     try {
-      // Update status on server (use whatever endpoint you already wired up)
       await fetch(`${API_BASE_URL}/conversations?end=true`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ convKey: currentConvKey })
+        body: JSON.stringify({ convKey: currentConvKey }),
       }).catch(() => null);
 
-      // Persist a system message so it also appears under Archive.
-      await sendMessage(currentConvKey, "System", "system", "Conversation ended by trainer/admin");
+      // Show system message (visible to both roles)
+      const sys = document.createElement("div");
+      sys.style.cssText = "text-align:center;color:#DC2626;margin:10px 0;font-weight:600;";
+      sys.textContent = "— Conversation ended by trainer —";
+      container.appendChild(sys);
+    } catch {}
 
-      // Show immediately (centered, red)
-      showSystemMessage("Conversation ended by trainer/admin", document.getElementById("messages"), true);
+    // Disable both sides immediately
+    input.disabled = true;
+    sendBtn.disabled = true;
+    stopDurationTimer(currentConvKey);
+    stopHeaderTimer();
 
-      // Lock input and stop timers
-      inputDisabledState(true);
-      stopHeaderTimer();
-    } catch (e) {
-      console.warn("End conversation error:", e);
-      inputDisabledState(true);
-      stopHeaderTimer();
+    // If agent is viewing this conversation, show 30s countdown
+    if (role === "agent") {
+      showAgentLogoutCountdown(container);
     }
   });
 }
+
 
     // If conversation is ended, disable input and show message
     if (conv.ended) {
@@ -530,6 +533,31 @@ function showSystemMessage(text, container = document.getElementById("messages")
       input.style.opacity = "1";
     }
   }
+  function showAgentLogoutCountdown(container) {
+  const countdownEl = document.createElement("div");
+  countdownEl.style.cssText = `
+    text-align:center;
+    font-size:0.95rem;
+    color:#b91c1c;
+    font-weight:600;
+    margin:1rem 0;
+  `;
+  let remaining = 30;
+  countdownEl.textContent = `Session ending in ${remaining}s...`;
+  container.appendChild(countdownEl);
+
+  const timer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      countdownEl.textContent = "Session ended.";
+      logout();
+    } else {
+      countdownEl.textContent = `Session ending in ${remaining}s...`;
+    }
+  }, 1000);
+}
+
   function escapeHtml(s) {
     return String(s || "").replace(/[&<>"']/g, (m) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])
