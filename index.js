@@ -650,7 +650,7 @@ function subscribeToMessages(convKey, headerEl) {
             if (isTrainerOrAdmin()) {
               loadConversations("archive").catch(() => {});
             }
-            continue; // skip rest of loop
+            continue;
           }
 
           // regular message flow
@@ -668,7 +668,6 @@ function subscribeToMessages(convKey, headerEl) {
 
         if (gotNew && firstMsgTs) startHeaderTimer(headerEl);
 
-        // optional: stop timer if backend includes flag
         if (p.ended === true) stopHeaderTimer();
 
         if (isTrainerOrAdmin()) loadConversations("home").catch(() => {});
@@ -682,4 +681,32 @@ function subscribeToMessages(convKey, headerEl) {
     setTimeout(() => subscribeToMessages(convKey, headerEl), 3000);
   };
 }
+
+// Logout
+logoutBtn?.addEventListener("click", () => {
+  ["convKey", "trainerName", "role", "user"].forEach((k) => localStorage.removeItem(k));
+  logout();
+});
+
+// Nav
+if (navRail && role !== "agent") {
+  navRail.addEventListener("click", (e) => {
+    const btn = e.target.closest(".nav-item");
+    if (!btn) return;
+    setActiveTab(btn.dataset.tab);
+  });
+}
+
+// Resize height sync
+window.addEventListener("resize", syncHeights);
+
+// Kickoff
+if (role !== "agent") {
+  setActiveTab("home");
+  updateHomeBadge();
+} else {
+  await loadAgentConversation();
+}
+});
+
 
