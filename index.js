@@ -392,7 +392,7 @@ sendBtn.addEventListener("click", async () => {
 
 
     // End conversation (trainer/admin only)
-const endBtnEl = document.getElementById("endConvBtn");
+const endBtnEl = document.getElementById("endBtn");
 if (endBtnEl) {
   endBtnEl.addEventListener("click", async () => {
     try {
