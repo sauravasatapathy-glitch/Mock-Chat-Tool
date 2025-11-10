@@ -2,136 +2,84 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mock Chat Login</title>
+  <title>MockChat Login</title>
   <style>
-    /* ---- Base Layout ---- */
     body {
       margin: 0;
       font-family: "Inter", system-ui, sans-serif;
       height: 100vh;
+      background: url("wallpaper.png") center/cover no-repeat; /* replace with your wallpaper path */
       display: flex;
-      overflow: hidden;
+      align-items: center;
+      justify-content: center;
       color: #1e1b4b;
     }
 
-    /* ---- Wallpaper Section ---- */
-    .right-pane {
-      flex: 1.5;
-      background: linear-gradient(135deg, #d8b4fe, #c084fc, #a855f7);
-      background-size: 400% 400%;
-      animation: gradientShift 15s ease infinite;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    .right-pane::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: url("https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80") center/cover no-repeat;
-      opacity: 0.35;
-      mix-blend-mode: overlay;
-    }
-
-    /* ---- Logo + Branding ---- */
-    .branding {
-      position: relative;
+    /* ---- Floating Login Box ---- */
+    .login-container {
+      background: rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      border-radius: 1.2rem;
+      padding: 2.2rem 2rem;
+      width: 95%;
+      max-width: 360px;
       text-align: center;
-      z-index: 1;
-      color: #fff;
-      text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      animation: fadeIn 0.8s ease;
     }
 
-    .branding h1 {
-      font-size: 3rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-      letter-spacing: 1px;
-    }
-
-    .branding p {
-      font-size: 1.1rem;
-      opacity: 0.9;
-      font-weight: 400;
-    }
-
-    /* ---- Login Panel ---- */
-    .left-pane {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(12px);
-      box-shadow: 6px 0 18px rgba(0,0,0,0.1);
-      padding: 2rem;
-    }
-
-    .login-box {
-      width: 100%;
-      max-width: 340px;
-      background: rgba(255,255,255,0.9);
-      padding: 2rem;
-      border-radius: 1rem;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     h2 {
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
       color: #4c1d95;
-      text-align: center;
       font-weight: 700;
     }
 
-    input, select {
+    input {
       width: 100%;
-      padding: 0.7rem;
+      padding: 0.8rem;
       margin-bottom: 1rem;
-      border: 1px solid #c4b5fd;
+      border: 1px solid rgba(156, 163, 175, 0.4);
       border-radius: 0.6rem;
       font-size: 1rem;
-      background: #fafafa;
-      transition: border 0.2s ease;
+      background: rgba(255, 255, 255, 0.6);
+      transition: all 0.2s ease;
     }
 
     input:focus {
       outline: none;
       border-color: #8b5cf6;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.85);
     }
 
     button {
+      width: 100%;
       background: linear-gradient(90deg, #7c3aed, #9333ea);
-      color: #fff;
+      color: white;
       border: none;
       border-radius: 0.6rem;
-      padding: 0.8rem 1rem;
-      width: 100%;
-      font-size: 1rem;
+      padding: 0.9rem;
       font-weight: 600;
+      font-size: 1rem;
       cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.3s ease;
+      transition: all 0.2s ease;
     }
 
     button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(147,51,234,0.4);
+      box-shadow: 0 4px 10px rgba(147, 51, 234, 0.4);
     }
 
     .toggle {
       color: #7c3aed;
-      cursor: pointer;
-      text-align: center;
       margin-top: 1rem;
       font-size: 0.9rem;
+      cursor: pointer;
       font-weight: 500;
     }
 
@@ -143,45 +91,67 @@
       color: #dc2626;
       font-size: 0.9rem;
       margin-bottom: 0.5rem;
-      text-align: center;
     }
 
     .hint {
       font-size: 0.85rem;
-      color: #6b7280;
+      color: #4b5563;
       margin-bottom: 0.6rem;
-      text-align: left;
+    }
+
+    /* Branding centered background */
+    .branding {
+      position: absolute;
+      bottom: 8%;
+      text-align: center;
+      color: white;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+
+    .branding h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 0.3rem;
+      letter-spacing: 1px;
+    }
+
+    .branding p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      font-weight: 400;
+    }
+
+    @media (max-width: 768px) {
+      .login-container {
+        width: 85%;
+        padding: 1.8rem;
+      }
+      .branding h1 { font-size: 2.2rem; }
     }
   </style>
 </head>
 <body>
-  <!-- Left Semi-Transparent Pane -->
-  <div class="left-pane">
-    <div class="login-box">
-      <h2 id="loginTitle">Trainer / Admin Login</h2>
-      <div id="error" class="error"></div>
+  <div class="login-container">
+    <h2 id="loginTitle">Trainer / Admin Login</h2>
+    <div id="error" class="error"></div>
 
-      <div id="trainerAdminFields">
-        <input type="email" id="email" placeholder="Email" />
-        <input type="password" id="password" placeholder="Password" />
-      </div>
-
-      <div id="agentFields" style="display: none;">
-        <div class="hint">Enter the Conversation Key provided by your trainer</div>
-        <input type="text" id="convKey" placeholder="Conversation Key" />
-      </div>
-
-      <button id="loginBtn">Login</button>
-      <div class="toggle" id="toggleMode">Login as Agent</div>
+    <div id="trainerAdminFields">
+      <input type="email" id="email" placeholder="Email" />
+      <input type="password" id="password" placeholder="Password" />
     </div>
+
+    <div id="agentFields" style="display: none;">
+      <div class="hint">Enter the Conversation Key provided by your trainer</div>
+      <input type="text" id="convKey" placeholder="Conversation Key" />
+    </div>
+
+    <button id="loginBtn">Login</button>
+    <div class="toggle" id="toggleMode">Login as Agent</div>
   </div>
 
-  <!-- Right Wallpaper + Branding -->
-  <div class="right-pane">
-    <div class="branding">
-      <h1>MockChat</h1>
-      <p>Smart Conversations. Seamless Collaboration.</p>
-    </div>
+  <div class="branding">
+    <h1>MockChat</h1>
+    <p>Smart Conversations. Seamless Collaboration.</p>
   </div>
 
   <script type="module" src="./login.js"></script>
