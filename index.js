@@ -117,7 +117,7 @@ onReady(async () => {
           <input id="createTrainer" placeholder="Trainer name" class="lavender-input"/>
           <label style="font-weight:500;">Associate</label>
           <input id="createAssociate" placeholder="Associate name" class="lavender-input"/>
-          <button id="createBtn" class="lavender-btn" style="height:30px">Create</button>
+          <button id="createBtn" class="lavender-btn" style="height:35px">Create</button>
           <div id="createNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
         </div>
       `;
@@ -153,7 +153,7 @@ onReady(async () => {
         <div style="padding:1rem;display:flex;flex-direction:column;gap:10px;">
           <label>From</label><input type="date" id="rFrom" class="lavender-input"/>
           <label>To</label><input type="date" id="rTo" class="lavender-input"/>
-          <button id="rExport" class="lavender-btn">Export CSV</button>
+          <button id="rExport" class="lavender-btn" style="height:35px">Export CSV</button>
           <div id="rNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
         </div>
       `;
