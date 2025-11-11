@@ -118,7 +118,7 @@ onReady(async () => {
           <label style="font-weight:500;">Associate</label>
           <input id="createAssociate" placeholder="Associate name" class="lavender-input"/>
           <button id="createBtn" class="lavender-btn">Create</button>
-          <div id="createNote" style="size:15px;font-size:12px;opacity:.8;margin-top:6px;"></div>
+          <div id="createNote" style="height:15px;font-size:12px;opacity:.8;margin-top:6px;"></div>
         </div>
       `;
       const t = document.getElementById("createTrainer");
