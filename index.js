@@ -117,7 +117,7 @@ onReady(async () => {
           <input id="createTrainer" placeholder="Trainer name" class="lavender-input"/>
           <label style="font-weight:500;">Associate</label>
           <input id="createAssociate" placeholder="Associate name" class="lavender-input"/>
-          <button id="createBtn" class="lavender-btn" style="height:20px">Create</button>
+          <button id="createBtn" class="lavender-btn" style="height:30px">Create</button>
           <div id="createNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
         </div>
       `;
