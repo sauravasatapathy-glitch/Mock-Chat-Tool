@@ -159,7 +159,44 @@ onReady(async () => {
       `;
       const btn = document.getElementById("rExport");
       const note = document.getElementById("rNote");
-      btn.onclick = () => (note.textContent = "Coming soon: report export.");
+      btn.onclick = async () => {
+        const from = document.getElementById("rFrom").value;
+        const to = document.getElementById("rTo").value;
+
+        if (!from || !to) {
+          note.textContent = "⚠️ Please select both start and end dates.";
+          return;
+        }
+
+        try {
+          note.textContent = "⏳ Generating report...";
+
+          const res = await fetch(
+            `${API_BASE_URL}/reports?from=${from}&to=${to}`,
+            { headers: { ...authHeader } }
+          );
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Failed to export report");
+          }
+
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `mockchat-report-${from}-to-${to}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+
+          note.textContent = "✅ Report downloaded successfully!";
+        } catch (err) {
+          console.error(err);
+          note.textContent = `❌ ${err.message}`;
+          }
+      };
     }
 
     if (window.lucide?.createIcons) window.lucide.createIcons({ icons: window.lucide.icons });
