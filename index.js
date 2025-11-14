@@ -299,17 +299,18 @@ if (role === "agent") {
 // ---- Filtering loader (Queue/Home/Archive) ----
 async function loadConversations(tab = "home") {
   try {
-    const url =
-      role === "admin"
-        ? `${API_BASE_URL}/conversations?all=true`
-        : `${API_BASE_URL}/conversations?trainer=${encodeURIComponent(user.name)}`;
+    const url = `${API_BASE_URL}/conversations?all=true`;
 
     const res = await fetch(url, { headers: { ...authHeader } });
-    const data = await res.json();
+    let data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to load conversations");
 
-    // Some backends don’t return msg_count. If missing, derive it on the fly.
-    // (Lightweight — only for items that aren’t ended.)
+    // 🔥 Trainer sees ONLY their own conversations
+    if (role === "trainer") {
+      data = data.filter(c => c.trainer_name === user.name);
+    }
+
+    // derive counts, categorize, etc… (rest unchanged)\
     const needCounts = data.filter(c => !c.ended && (c.msg_count == null));
     if (needCounts.length) {
       await Promise.all(
@@ -343,7 +344,6 @@ async function loadConversations(tab = "home") {
     }
   }
 }
-
 
   function renderList(id, items) {
     const ul = document.getElementById(id);
