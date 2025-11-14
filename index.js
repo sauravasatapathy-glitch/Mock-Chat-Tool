@@ -42,7 +42,7 @@ if (role === "agent") {
   const leftPane = document.getElementById("left-pane");
   const navRail = document.getElementById("nav-rail");
   if (leftPane) leftPane.style.display = "none";
-  if (navRail) navRail.style.display = "none";
+//  if (navRail) navRail.style.display = "none";
 
   // Optional: make chat content take full width
   const chatPane = document.getElementById("chat-pane") || document.getElementById("chatContent");
