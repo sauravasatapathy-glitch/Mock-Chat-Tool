@@ -198,6 +198,69 @@ onReady(async () => {
           }
       };
     }
+    else if (tab === "users") {
+      // 🧩 Manage Users (Admins Only)
+      leftPane.innerHTML = `
+        <h3 class="app-header" style="background:#6D28D9;color:white;text-align:center;padding:0.8rem;border-radius:10px 10px 0 0;margin:0;">
+          Manage Users
+        </h3>
+        <div style="padding:1rem;display:flex;flex-direction:column;gap:10px;">
+          <label style="font-weight:500;">Name</label>
+          <input id="userName" placeholder="Enter name" class="lavender-input"/>
+      
+          <label style="font-weight:500;">Email</label>
+          <input id="userEmail" placeholder="Enter email" class="lavender-input"/>
+
+          <label style="font-weight:500;">Role</label>
+          <select id="userRole" class="lavender-input">
+            <option value="" disabled selected>Select role</option>
+            <option value="trainer">Trainer</option>
+            <option value="admin">Admin</option>
+          </select>
+
+          <button id="inviteBtn" class="lavender-btn" style="height:35px">Invite User</button>
+          <div id="inviteNote" style="font-size:12px;opacity:.8;margin-top:6px;"></div>
+        </div>
+      `;
+
+      const inviteBtn = document.getElementById("inviteBtn");
+      const inviteNote = document.getElementById("inviteNote");
+
+      inviteBtn.onclick = async () => {
+        const name = document.getElementById("userName").value.trim();
+        const email = document.getElementById("userEmail").value.trim();
+        const role = document.getElementById("userRole").value;
+
+        if (!name || !email || !role) {
+          inviteNote.textContent = "⚠️ Please fill in all fields.";
+          inviteNote.style.color = "red";
+          return;
+        }
+
+        try {
+          inviteNote.textContent = "⏳ Sending invite...";
+          inviteNote.style.color = "inherit";
+
+          const res = await fetch(`${API_BASE_URL}/users`, {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              ...authHeader
+            },
+            body: JSON.stringify({ name, email, role }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to invite user");
+
+          inviteNote.textContent = `✅ Invite sent to ${email}`;
+          inviteNote.style.color = "green";
+        } catch (err) {
+          inviteNote.textContent = `❌ ${err.message}`;
+          inviteNote.style.color = "red";
+        }
+      };
+    }
 
     if (window.lucide?.createIcons) window.lucide.createIcons({ icons: window.lucide.icons });
     syncHeights();
@@ -732,6 +795,11 @@ if (navRail && role !== "agent") {
     if (!btn) return;
     setActiveTab(btn.dataset.tab);
   });
+}
+// Hide Manage Users for non-admins
+if (role !== "admin") {
+  const manageUsersTab = navRail.querySelector('[data-tab="users"]');
+  if (manageUsersTab) manageUsersTab.style.display = "none";
 }
 
 // Resize height sync
